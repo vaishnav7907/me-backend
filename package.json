@@ -12,9 +12,13 @@
   "description": "",
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "cloudinary": "^2.10.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "mongoose": "^9.9.1",
-    "nodemon": "^3.1.14"
+    "multer": "^2.2.0",
+    "nodemon": "^3.1.14",
+    "sharp": "^0.35.3",
+    "streamifier": "^0.1.1"
   }
 }
