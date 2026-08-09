@@ -1,5 +1,5 @@
 const dressModel = require("../../model/dress/dress");
-const cloudinary = require("../../utility/multer");
+const cloudinary = require("../../cloudinary/cloudinaryConfig");
 const sharp = require("sharp");
 const streamFier = require("streamifier");
 ///create dress //////////////////////
@@ -58,7 +58,6 @@ const createDress = async (req, res) => {
       name,
     });
 
-    await createDressData.save();
 
     res.status(201).json(createDressData);
   } catch (error) {
@@ -78,11 +77,54 @@ const updateDress = async (req, res) => {
       brandName,
       realPrize,
       prize,
-      image,
       category,
       name,
     } = req.body;
+
     const { id } = req.params;
+
+    const existingDessData = await dressModel.findById(id);
+    if (!existingDessData) {
+      return res.status(404).json({
+        message: "dress not found",
+      });
+    }
+    // default old image
+    let image = existingDessData.image;
+
+    if (req.file) {
+      // Get image buffer from RAM
+      const imageBuffer = req.file.buffer;
+
+      // optimizeimg
+      const optimizeImg = await sharp(imageBuffer)
+        .webp({
+          quality: 80,
+        })
+        .toBuffer();
+
+      // upload to cloudinary
+
+      const uploadToCloud = await new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          {
+            folder: "ME/dressess",
+          },
+          (error, result) => {
+            if (error) {
+              reject(error);
+            } else {
+              resolve(result);
+            }
+
+            
+          },
+        );
+
+        streamFier.createReadStream(optimizeImg).pipe(uploadStream);
+      });
+      image = uploadToCloud.secure_url;
+    }
     const updt = await dressModel.findByIdAndUpdate(
       id,
       {
@@ -96,7 +138,7 @@ const updateDress = async (req, res) => {
         category,
         name,
       },
-      { new: true },
+      { new: true, runValidators: true },
     );
 
     res.status(201).json(updt);
