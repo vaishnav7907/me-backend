@@ -3,66 +3,133 @@ const cloudinary = require("../../cloudinary/cloudinaryConfig");
 const sharp = require("sharp");
 const streamFier = require("streamifier");
 ///create dress //////////////////////
+
 const createDress = async (req, res) => {
   try {
+    console.log("REQ BODY:", req.body);
+    console.log("REQ FILES:", req.files);
     const {
-      color,
-      size,
-      brandIcon,
-      brandName,
-      realPrize,
-      prize,
+      Name,
       category,
-      name,
+      price,
+      realPrice,
+      brandName,
+      brandIcon,
+      color,
+      colorCode,
+      sizes,
     } = req.body;
-    if (!req.file) {
+
+    if (!req.files) {
       return res.status(400).json({
         message: "Image is required",
       });
     }
-    const imageBuffer = req.file.buffer;
 
-    // optimize image
+    if (!color || !colorCode) {
+      return res
+        .status(400)
+        .json({ message: "Color and color code are required" });
+    }
 
-    const optimizedImg = await sharp(imageBuffer)
-      .webp({ quality: 80 })
-      .toBuffer();
+    if (!sizes) {
+      return res.status(400).json({ message: "Sizes are required" });
+    }
 
-    //upload media to cloudinary
-    const result = await new Promise((resolve, reject) => {
-      const uploadStream = cloudinary.uploader.upload_stream(
-        {
-          folder: "ME/dressess",
+    // Convert sizes from string to array
+    //when size send from frontend to backend an string array. means '[{"size":"S","stock":10},{"size":"M","stock":20},{"size":"L","stock":15}]' so here we wnat to converts to an array
+
+    let parsedSizes;
+
+    try {
+      parsedSizes = JSON.parse(sizes); //JSON.parse() is used to convert a JSON string into a JavaScript value (object, array, etc.).
+      console.log("parsed sizes", parsedSizes);
+    } catch (error) {
+      return res.status(400).json({ message: "Invalid sizes format" });
+    }
+
+    let uploadedImage = [];
+
+    console.log("uploaded image", uploadedImage);
+
+    for (const file of req.files) {
+      // for (const file of req.file) used for , here we uploading multiple files so thee files remain in an array. here for (const file of req.file)file is means a file from from array of file. take a file for here we using sharp need particular image data to optimize .
+      const imageBuffer = file.buffer;
+
+      console.log("img buffer", imageBuffer);
+
+      // optimize image
+
+      const optimizedImg = await sharp(imageBuffer)
+        .webp({ quality: 80 })
+        .toBuffer();
+
+      console.log("optimize image", optimizedImg);
+
+      //upload media to cloudinary
+
+      const result = await new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          {
+            folder:"Me/Dresses",
+          },
+
+          (error, result) => {
+            if (error) {
+              console.log("cloudinary error", error);
+
+              reject(error);
+            } else {
+              console.log("UPLOAD SUCCESS:", result);
+              resolve(result);
+            }
+
+            // if (error) return reject(error);
+            // resolve(result);
+          },
+        );
+        streamFier.createReadStream(optimizedImg).pipe(uploadStream);
+
+        console.log("streamifier", streamFier);
+
+        console.log("upload stream", uploadStream);
+      });
+
+      console.log("resulttt", result);
+
+      uploadedImage.push(result.secure_url); //this gives after upload a url. and when create it it shows in mongodb
+    }
+
+    //create variants
+    const variants = [
+      {
+        color: {
+          name: color,
+          code: colorCode,
         },
-        (error, result) => {
-          if (error) {
-            reject(error);
-          } else {
-            resolve(result);
-          }
-        },
-      );
-      streamFier.createReadStream(optimizedImg).pipe(uploadStream);
-    });
 
-    const image = result.secure_url;
+        images: uploadedImage,
+        sizes: parsedSizes,
+      },
+    ];
+
+    console.log("varients...", variants);
+
     const createDressData = await dressModel.create({
-      color,
-      size,
-      brandIcon,
-      brandName,
-      realPrize,
-      prize,
-      image,
+      Name,
       category,
-      name,
+      price,
+      realPrice,
+      brandName,
+      brandIcon,
+      variants,
     });
 
-
+    console.log("createdress", createDressData);
     res.status(201).json(createDressData);
   } catch (error) {
     console.log("error in create dress", error);
-    res.status(500).json({ message: error });
+    res.status(500).json({ message: error.message });
   }
 };
 
@@ -71,26 +138,43 @@ const createDress = async (req, res) => {
 const updateDress = async (req, res) => {
   try {
     const {
-      color,
-      size,
-      brandIcon,
-      brandName,
-      realPrize,
-      prize,
-      category,
       name,
+      price,
+      realPrice,
+      brandName,
+      brandIcon,
+      color,
+      colorCode,
+      sizes,
     } = req.body;
 
     const { id } = req.params;
 
-    const existingDessData = await dressModel.findById(id);
-    if (!existingDessData) {
+    const product = await dressModel.findById(productid);
+    if (!product) {
       return res.status(404).json({
         message: "dress not found",
       });
     }
+
+    const variant = product.variants.id(variantid);
+    if (!variant) {
+      return res.status(404).json({ message: "Variant not found" });
+    }
+
+    let parsedsizes;
+
+    try {
+      parsedsizes = JSON.parse(sizes);
+    } catch (error) {
+      return res.status(400).json({ message: "Invalid sizes format" });
+    }
     // default old image
-    let image = existingDessData.image;
+    let uploadedimage = [];
+
+    if (existingDessData.variants && existingDessData.variants.length > 0) {
+      uploadedimage = existingDessData.variants[0].images || [];
+    }
 
     if (req.file) {
       // Get image buffer from RAM
@@ -108,7 +192,7 @@ const updateDress = async (req, res) => {
       const uploadToCloud = await new Promise((resolve, reject) => {
         const uploadStream = cloudinary.uploader.upload_stream(
           {
-            folder: "ME/dressess",
+            folder: "ME/dresses",
           },
           (error, result) => {
             if (error) {
@@ -116,8 +200,6 @@ const updateDress = async (req, res) => {
             } else {
               resolve(result);
             }
-
-            
           },
         );
 

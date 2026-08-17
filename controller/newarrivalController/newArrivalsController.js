@@ -39,10 +39,28 @@ const createNewArrivals = async (req, res) => {
 
     res.status(201).json(createnew);
   } catch (error) {
-    console.log(" error in create new ariivals :", error);
-    res.status(500).json({ error: "iinternal server error" });
+   console.log("ERROR IN CREATE NEW ARRIVAL:", error);
+
+  res.status(500).json({
+    message: "Internal server error",
+    error: error.message,
+  });
   }
 };
+
+// const createNewArrivals= async ()=>{
+//   try {
+//    const { description, category, name } = req.body;
+//    if(!req.file){
+//      return res.status(400).json({ message: "select an image" });
+//    }
+
+
+//    const newArrival= await newArrivalModel.create({description, category, name}) 
+//   } catch (error) {
+    
+//   }
+// }
 
 const updateNewArrivals = async (req, res) => {
   try {
@@ -65,7 +83,7 @@ const updateNewArrivals = async (req, res) => {
 
       const newArrivalsUpdtTocloud = await new Promise((resolve, reject) => {
         const toCloudinary = cloudinary.uploader.upload_stream(
-          { folder: "Me/NewArrivals" },
+          { folder: "ME/NewArrivals" },
           (error, result) => {
             if (error) {
               reject(error);
