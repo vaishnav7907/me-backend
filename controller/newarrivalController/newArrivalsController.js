@@ -17,7 +17,7 @@ const createNewArrivals = async (req, res) => {
     const uploadnewArrivalImg = await new Promise((resolve, reject) => {
       const uploadImage = cloudinary.uploader.upload_stream(
         {
-          folder: "ME/NewArrivals",
+          folder: "Me/Newarrivals",
         },
         (error, result) => {
           if (error) {
