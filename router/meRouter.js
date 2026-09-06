@@ -1,22 +1,39 @@
-const express = require("express")
-const { createNewArrivals, updateNewArrivals, getNewArrivals, deleteNewArrivals } = require("../controller/newarrivalController/newArrivalsController")
-const upload= require("../utility/multer")
-const { createDress } = require("../controller/dressController/dressController")
-const router=express.Router()
+const express = require("express");
+const {
+  createNewArrivals,
+  updateNewArrivals,
+  getNewArrivals,
+  deleteNewArrivals,
+} = require("../controller/newarrivalController/newArrivalsController");
+const upload = require("../utility/multer");
+const {
+  createDress,
+} = require("../controller/dressController/dressController");
+const {
+  userSignUp,
+  adminSignUp,
+  userAdminLogin,
+} = require("../controller/authController/authenticationController");
+const router = express.Router();
+
+// authentication user and admin
+router.post("/userSignup", userSignUp);
+router.post("/adminSignup", adminSignUp);
+
+router.post("/userAdminLogin",userAdminLogin)
+///////--------------------------
 
 
 // new arrival start//////////////
-router.post("/createNewArrival",upload.single("image"),createNewArrivals)
-router.patch("/updateNewArrivals/:id",updateNewArrivals)
-router.get("/getNewArrivals",getNewArrivals)
-router.delete("/deleteNewArrivals/:id",deleteNewArrivals)
-//new arrival end/////////////////
-
+router.post("/createNewArrival", upload.single("image"), createNewArrivals);
+router.patch("/updateNewArrivals/:id", updateNewArrivals);
+router.get("/getNewArrivals", getNewArrivals);
+router.delete("/deleteNewArrivals/:id", deleteNewArrivals);
+//////-----------------------------
 
 //dress route
 
 // createdress
-router.post("/createDress" ,upload.array("images",10) ,createDress)
+router.post("/createDress", upload.array("images", 10), createDress);
 
-
-module.exports=router
+module.exports = router;
