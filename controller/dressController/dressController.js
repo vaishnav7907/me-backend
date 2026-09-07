@@ -3,133 +3,140 @@ const cloudinary = require("../../cloudinary/cloudinaryConfig");
 const sharp = require("sharp");
 const streamFier = require("streamifier");
 ///create dress //////////////////////
-
 const createDress = async (req, res) => {
   try {
     console.log("REQ BODY:", req.body);
     console.log("REQ FILES:", req.files);
+
     const {
-      Name,
-      category,
-      price,
-      realPrice,
-      brandName,
-      brandIcon,
-      color,
-      colorCode,
-      sizes,
-    } = req.body;
-
-    if (!req.files) {
-      return res.status(400).json({
-        message: "Image is required",
-      });
-    }
-
-    if (!color || !colorCode) {
-      return res
-        .status(400)
-        .json({ message: "Color and color code are required" });
-    }
-
-    if (!sizes) {
-      return res.status(400).json({ message: "Sizes are required" });
-    }
-
-    // Convert sizes from string to array
-    //when size send from frontend to backend an string array. means '[{"size":"S","stock":10},{"size":"M","stock":20},{"size":"L","stock":15}]' so here we wnat to converts to an array
-
-    let parsedSizes;
-
-    try {
-      parsedSizes = JSON.parse(sizes); //JSON.parse() is used to convert a JSON string into a JavaScript value (object, array, etc.).
-      console.log("parsed sizes", parsedSizes);
-    } catch (error) {
-      return res.status(400).json({ message: "Invalid sizes format" });
-    }
-
-    let uploadedImage = [];
-
-    console.log("uploaded image", uploadedImage);
-
-    for (const file of req.files) {
-      // for (const file of req.file) used for , here we uploading multiple files so thee files remain in an array. here for (const file of req.file)file is means a file from from array of file. take a file for here we using sharp need particular image data to optimize .
-      const imageBuffer = file.buffer;
-
-      console.log("img buffer", imageBuffer);
-
-      // optimize image
-
-      const optimizedImg = await sharp(imageBuffer)
-        .webp({ quality: 80 })
-        .toBuffer();
-
-      console.log("optimize image", optimizedImg);
-
-      //upload media to cloudinary
-
-      const result = await new Promise((resolve, reject) => {
-        const uploadStream = cloudinary.uploader.upload_stream(
-          {
-            folder:"Me/Dresses",
-          },
-
-          (error, result) => {
-            if (error) {
-              console.log("cloudinary error", error);
-
-              reject(error);
-            } else {
-              console.log("UPLOAD SUCCESS:", result);
-              resolve(result);
-            }
-
-            // if (error) return reject(error);
-            // resolve(result);
-          },
-        );
-        streamFier.createReadStream(optimizedImg).pipe(uploadStream);
-
-        console.log("streamifier", streamFier);
-
-        console.log("upload stream", uploadStream);
-      });
-
-      console.log("resulttt", result);
-
-      uploadedImage.push(result.secure_url); //this gives after upload a url. and when create it it shows in mongodb
-    }
-
-    //create variants
-    const variants = [
-      {
-        color: {
-          name: color,
-          code: colorCode,
-        },
-
-        images: uploadedImage,
-        sizes: parsedSizes,
-      },
-    ];
-
-    console.log("varients...", variants);
-
-    const createDressData = await dressModel.create({
-      Name,
+      name,
+      description,
       category,
       price,
       realPrice,
       brandName,
       brandIcon,
       variants,
+      sku,
+      status,
+    } = req.body;
+
+    // ================= VALIDATION =================
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        message: "At least one image is required",
+      });
+    }
+
+    if (!variants) {
+      return res.status(400).json({
+        message: "Variants are required",
+      });
+    }
+
+    // ================= PARSE VARIANTS =================
+
+    let parsedVariants;
+
+    try {
+      parsedVariants = JSON.parse(variants);
+
+      if (!Array.isArray(parsedVariants)) {
+        return res.status(400).json({
+          message: "Variants must be an array",
+        });
+      }
+    } catch (error) {
+      return res.status(400).json({
+        message: "Invalid variants format",
+      });
+    }
+
+    console.log("PARSED VARIANTS:", parsedVariants);
+
+    // ================= UPLOAD IMAGES =================
+
+    const uploadedImage = [];
+
+    for (const file of req.files) {
+      const imageBuffer = file.buffer;
+
+      // Optimize image
+      const optimizedImg = await sharp(imageBuffer)
+        .webp({ quality: 80 })
+        .toBuffer();
+
+      // Upload to Cloudinary
+      const result = await new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          {
+            folder: "Me/Dresses",
+          },
+          (error, result) => {
+            if (error) {
+              console.log("Cloudinary error:", error);
+              reject(error);
+            } else {
+              console.log("Upload success:", result);
+              resolve(result);
+            }
+          }
+        );
+
+        streamFier
+          .createReadStream(optimizedImg)
+          .pipe(uploadStream);
+      });
+
+      uploadedImage.push(result.secure_url);
+    }
+
+    console.log("UPLOADED IMAGES:", uploadedImage);
+
+    // ================= ADD IMAGES TO VARIANTS =================
+
+    const finalVariants = parsedVariants.map((variant) => ({
+      color: {
+        name: variant.color.name,
+        code: variant.color.code,
+      },
+
+      images: uploadedImage,
+
+      sizes: variant.sizes,
+    }));
+
+    console.log("FINAL VARIANTS:", finalVariants);
+
+    // ================= CREATE PRODUCT =================
+
+    const createDressData = await dressModel.create({
+      name,
+      description,
+      category,
+      price,
+      realPrice,
+      sku,
+      status,
+      brandName,
+      brandIcon,
+      variants: finalVariants,
     });
 
-    console.log("createdress", createDressData);
-    res.status(201).json(createDressData);
+    console.log("CREATED DRESS:", createDressData);
+
+    return res.status(201).json({
+      message: "Product created successfully",
+      product: createDressData,
+    });
   } catch (error) {
-    console.log("error in create dress", error);
-    res.status(500).json({ message: error.message });
+    console.log("Error in create dress:", error);
+
+    return res.status(500).json({
+      message: "Failed to create product",
+      error: error.message,
+    });
   }
 };
 

@@ -3,7 +3,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const userSignUp = async (req, res) => {
   try {
-    const { FullName, Email, Password, role } = req.body;
+    const { FullName, Email, Password } = req.body;
     const existingemail = await authModel.findOne({ Email });
     if (existingemail) {
       return res.status(409).json({ message: "email already exist" });
@@ -29,7 +29,6 @@ const userSignUp = async (req, res) => {
         id: createUser._id,
         name: createUser.FullName,
         email: createUser.Email,
-        password: createUser.Password,
         role: createUser.role,
       },
     });
@@ -43,7 +42,7 @@ const userSignUp = async (req, res) => {
 
 const adminSignUp = async (req, res) => {
   try {
-    const { FullName, Email, Password, role } = req.body;
+    const { FullName, Email, Password } = req.body;
     const emailExist = await authModel.findOne({ Email });
 
     if (emailExist) {
@@ -70,7 +69,6 @@ const adminSignUp = async (req, res) => {
         id: createadmin._id,
         name: createadmin.FullName,
         email: createadmin.Email,
-        password: createadmin.Password,
         role: createadmin.role,
       },
     });
@@ -82,7 +80,7 @@ const adminSignUp = async (req, res) => {
   }
 };
 
-const userAdminLogin = async (req,res) => {
+const userAdminLogin = async (req, res) => {
   try {
     const { FullName, Password } = req.body;
     if (!FullName || !Password) {
@@ -97,6 +95,12 @@ const userAdminLogin = async (req,res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
+      // Only admin can access admin login
+    if (exist.role !== "admin") {
+      return res.status(403).json({
+        message: "Admin access required",
+      });
+    }
     const isPasswordMatch = await bcrypt.compare(Password, exist.Password);
 
     if (!isPasswordMatch) {
@@ -126,4 +130,4 @@ const userAdminLogin = async (req,res) => {
   }
 };
 
-module.exports = { userSignUp, adminSignUp,userAdminLogin };
+module.exports = { userSignUp, adminSignUp, userAdminLogin };
