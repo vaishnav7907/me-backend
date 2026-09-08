@@ -8,6 +8,7 @@ const {
 const upload = require("../utility/multer");
 const {
   createDress,
+  getProducts,
 } = require("../controller/dressController/dressController");
 const {
   userSignUp,
@@ -35,5 +36,9 @@ router.delete("/deleteNewArrivals/:id", deleteNewArrivals);
 
 // createdress
 router.post("/createDress", upload.array("images", 10), createDress);
+
+// get products
+
+router.get("/getProducts",getProducts)
 
 module.exports = router;

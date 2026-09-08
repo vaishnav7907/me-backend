@@ -21,8 +21,6 @@ const createDress = async (req, res) => {
       status,
     } = req.body;
 
-    // ================= VALIDATION =================
-
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({
         message: "At least one image is required",
@@ -34,8 +32,6 @@ const createDress = async (req, res) => {
         message: "Variants are required",
       });
     }
-
-    // ================= PARSE VARIANTS =================
 
     let parsedVariants;
 
@@ -55,19 +51,15 @@ const createDress = async (req, res) => {
 
     console.log("PARSED VARIANTS:", parsedVariants);
 
-    // ================= UPLOAD IMAGES =================
-
     const uploadedImage = [];
 
     for (const file of req.files) {
       const imageBuffer = file.buffer;
 
-      // Optimize image
       const optimizedImg = await sharp(imageBuffer)
         .webp({ quality: 80 })
         .toBuffer();
 
-      // Upload to Cloudinary
       const result = await new Promise((resolve, reject) => {
         const uploadStream = cloudinary.uploader.upload_stream(
           {
@@ -81,12 +73,10 @@ const createDress = async (req, res) => {
               console.log("Upload success:", result);
               resolve(result);
             }
-          }
+          },
         );
 
-        streamFier
-          .createReadStream(optimizedImg)
-          .pipe(uploadStream);
+        streamFier.createReadStream(optimizedImg).pipe(uploadStream);
       });
 
       uploadedImage.push(result.secure_url);
@@ -94,22 +84,32 @@ const createDress = async (req, res) => {
 
     console.log("UPLOADED IMAGES:", uploadedImage);
 
-    // ================= ADD IMAGES TO VARIANTS =================
-
     const finalVariants = parsedVariants.map((variant) => ({
       color: {
         name: variant.color.name,
-        code: variant.color.code,
+        code: variant.color.code || "#000000",
       },
 
       images: uploadedImage,
 
-      sizes: variant.sizes,
+      sizes: variant.sizes.map((size) => ({
+        size: size.size,
+        stock: Number(size.stock),
+      })),
     }));
 
-    console.log("FINAL VARIANTS:", finalVariants);
+    const totalStock = finalVariants.reduce(
+      (total, variant) =>
+        total +
+        variant.sizes.reduce(
+          (sizeTotal, size) => sizeTotal + size.stock,
+          0
+        ),
+      0
+    );
 
-    // ================= CREATE PRODUCT =================
+    console.log("FINAL VARIANTS:", finalVariants);
+    console.log("TOTAL STOCK:", totalStock);
 
     const createDressData = await dressModel.create({
       name,
@@ -117,6 +117,7 @@ const createDress = async (req, res) => {
       category,
       price,
       realPrice,
+      stock: totalStock,
       sku,
       status,
       brandName,
@@ -136,6 +137,26 @@ const createDress = async (req, res) => {
     return res.status(500).json({
       message: "Failed to create product",
       error: error.message,
+    });
+  }
+};
+
+// get products
+
+const getProducts = async (req, res) => {
+  try {
+    const products = await dressModel.find().sort({ createdAt: -1 });
+    res.status(200).json({
+      success: true,
+      count: products.length,
+      products,
+    });
+  } catch (error) {
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to get products",
     });
   }
 };
@@ -237,16 +258,7 @@ const updateDress = async (req, res) => {
   }
 };
 
-//get all dres///////////////////
-const getallDress = async (req, res) => {
-  try {
-    const getAllDressData = await dressModel.find();
-    res.status(201).json(getAllDressData);
-  } catch (error) {
-    console.log("error in get all dress data", error);
-    res.status(500).json({ message: error });
-  }
-};
+
 
 // get dress by category
 const getDressByCategory = async (req, res) => {
@@ -275,8 +287,8 @@ const deleteDress = async (req, res) => {
 
 module.exports = {
   createDress,
+  getProducts,
   updateDress,
-  getallDress,
   getDressByCategory,
   deleteDress,
 };
