@@ -17,14 +17,7 @@ const dressSchema = new mongoose.Schema(
     category: {
       type: String,
       required: true,
-      enum: [
-        "Shirts",
-        "Pants",
-        "Jackets",
-        "Innerwear",
-        "Shorts",
-        "T-Shirts",
-      ],
+      enum: ["Shirts", "Pants", "Jackets", "Innerwear", "Shorts", "T-Shirts"],
     },
 
     price: {
@@ -52,9 +45,8 @@ const dressSchema = new mongoose.Schema(
     },
 
     brandName: {
-      // type: mongoose.Schema.Types.ObjectId,
-      // ref: "brand",
-      type:String,required:true
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "brand",
     },
 
     brandIcon: {
@@ -103,7 +95,7 @@ const dressSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 const dressModel = mongoose.model("dress", dressSchema);

@@ -101,11 +101,8 @@ const createDress = async (req, res) => {
     const totalStock = finalVariants.reduce(
       (total, variant) =>
         total +
-        variant.sizes.reduce(
-          (sizeTotal, size) => sizeTotal + size.stock,
-          0
-        ),
-      0
+        variant.sizes.reduce((sizeTotal, size) => sizeTotal + size.stock, 0),
+      0,
     );
 
     console.log("FINAL VARIANTS:", finalVariants);
@@ -160,6 +157,7 @@ const getProducts = async (req, res) => {
     });
   }
 };
+
 
 ///update dres///////////////////////
 
@@ -258,8 +256,6 @@ const updateDress = async (req, res) => {
   }
 };
 
-
-
 // get dress by category
 const getDressByCategory = async (req, res) => {
   try {
@@ -288,7 +284,8 @@ const deleteDress = async (req, res) => {
 module.exports = {
   createDress,
   getProducts,
-  updateDress,
-  getDressByCategory,
-  deleteDress,
+  
+  // updateDress,
+  // getDressByCategory,
+  // deleteDress,
 };

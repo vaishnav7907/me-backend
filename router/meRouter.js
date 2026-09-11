@@ -1,10 +1,5 @@
 const express = require("express");
-const {
-  createNewArrivals,
-  updateNewArrivals,
-  getNewArrivals,
-  deleteNewArrivals,
-} = require("../controller/newarrivalController/newArrivalsController");
+
 const upload = require("../utility/multer");
 const {
   createDress,
@@ -15,22 +10,15 @@ const {
   adminSignUp,
   userAdminLogin,
 } = require("../controller/authController/authenticationController");
+const { getNewArrivals } = require("../controller/newarrivalController/newArrivalsController");
 const router = express.Router();
 
 // authentication user and admin
 router.post("/userSignup", userSignUp);
 router.post("/adminSignup", adminSignUp);
 
-router.post("/userAdminLogin",userAdminLogin)
+router.post("/userAdminLogin", userAdminLogin);
 ///////--------------------------
-
-
-// new arrival start//////////////
-router.post("/createNewArrival", upload.single("image"), createNewArrivals);
-router.patch("/updateNewArrivals/:id", updateNewArrivals);
-router.get("/getNewArrivals", getNewArrivals);
-router.delete("/deleteNewArrivals/:id", deleteNewArrivals);
-//////-----------------------------
 
 //dress route
 
@@ -39,6 +27,9 @@ router.post("/createDress", upload.array("images", 10), createDress);
 
 // get products
 
-router.get("/getProducts",getProducts)
+router.get("/getProducts", getProducts);
+
+// get new Arrivals
+router.get("/NewArrivals",getNewArrivals);
 
 module.exports = router;
