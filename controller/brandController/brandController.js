@@ -5,7 +5,7 @@ const cloudinary = require("../../cloudinary/cloudinaryConfig");
 const streamiFier = require("streamifier");
 const createBrand = async (req, res) => {
   try {
-    const { brandName, brandSlogan, brandIcon } = req.body;
+    const { brandName, brandSlogan, status } = req.body;
 
     if (!brandName) {
       return res.status(400).json({
@@ -50,6 +50,7 @@ const createBrand = async (req, res) => {
       brandName,
       brandIcon: result.secure_url,
       brandSlogan,
+      status
     });
 
     return res.status(201).json({
@@ -83,6 +84,7 @@ const getBrands = async (req, res) => {
           brandName: brand.brandName,
           brandIcon: brand.brandIcon,
           brandSlogan: brand.brandSlogan,
+          status:brand.status,
           productCount,
         };
       }),
