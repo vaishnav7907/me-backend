@@ -1,4 +1,5 @@
 const brandModel = require("../../model/brand/brand");
+const dressModel = require("../../model/dress/dress");
 const sharp = require("sharp");
 const cloudinary = require("../../cloudinary/cloudinaryConfig");
 const streamiFier = require("streamifier");
@@ -67,22 +68,37 @@ const createBrand = async (req, res) => {
   }
 };
 
-
-const getBrands= async(req,res)=>{
+const getBrands = async (req, res) => {
   try {
-    const getbrandFn= await brandModel.find().sort({brandName: 1})
+    const getbrandFn = await brandModel.find().sort({ brandName: 1 });
 
-      return res.status(200).json({
+    const brandWithCount = await Promise.all(
+      getbrandFn.map(async (brand) => {
+        const productCount = await dressModel.countDocuments({
+          brand: brand._id,
+        });
+
+        return {
+          _id: brand._id,
+          brandName: brand.brandName,
+          brandIcon: brand.brandIcon,
+          brandSlogan: brand.brandSlogan,
+          productCount,
+        };
+      }),
+    );
+
+    return res.status(200).json({
       success: true,
-      brand: getbrandFn,
+      brand: brandWithCount,
     });
   } catch (error) {
-     return res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Failed to get brands",
       error: error.message,
     });
   }
-}
+};
 
-module.exports = { createBrand ,getBrands};
+module.exports = { createBrand, getBrands };
