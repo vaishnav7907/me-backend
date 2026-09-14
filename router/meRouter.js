@@ -10,7 +10,13 @@ const {
   adminSignUp,
   userAdminLogin,
 } = require("../controller/authController/authenticationController");
-const { getNewArrivals } = require("../controller/newarrivalController/newArrivalsController");
+const {
+  getNewArrivals,
+} = require("../controller/newarrivalController/newArrivalsController");
+const {
+  createBrand,
+  getBrands,
+} = require("../controller/brandController/brandController");
 const router = express.Router();
 
 // authentication user and admin
@@ -30,6 +36,16 @@ router.post("/createDress", upload.array("images", 10), createDress);
 router.get("/getProducts", getProducts);
 
 // get new Arrivals
-router.get("/NewArrivals",getNewArrivals);
+router.get("/NewArrivals", getNewArrivals);
+
+// brand
+
+// create brand
+
+router.post("/createBrand", upload.single("brandIcon"), createBrand);
+
+// get brand
+
+router.get("/getBrand",getBrands)
 
 module.exports = router;

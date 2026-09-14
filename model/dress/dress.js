@@ -44,15 +44,12 @@ const dressSchema = new mongoose.Schema(
       default: "Draft",
     },
 
-    brandName: {
+    brand: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "brand",
     },
 
-    brandIcon: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "brand",
-    },
+   
 
     variants: [
       {

@@ -3,7 +3,7 @@ const dressModel = require("../../model/dress/dress");
 const getNewArrivals = async (req, res) => {
   try {
     const latestProducts = await dressModel
-      .find({})
+      .find({}).populate("brand")
       .sort({ createdAt: -1 });
 
     res.status(200).json({

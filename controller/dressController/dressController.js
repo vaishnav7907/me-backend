@@ -1,4 +1,5 @@
 const dressModel = require("../../model/dress/dress");
+const brandModel = require("../../model/brand/brand");
 const cloudinary = require("../../cloudinary/cloudinaryConfig");
 const sharp = require("sharp");
 const streamFier = require("streamifier");
@@ -14,8 +15,7 @@ const createDress = async (req, res) => {
       category,
       price,
       realPrice,
-      brandName,
-      brandIcon,
+      brand,
       variants,
       sku,
       status,
@@ -27,9 +27,24 @@ const createDress = async (req, res) => {
       });
     }
 
+    if (!brand) {
+      return res.status(400).json({
+        success: false,
+        message: "Brand is required",
+      });
+    }
+
     if (!variants) {
       return res.status(400).json({
         message: "Variants are required",
+      });
+    }
+
+    const existbrand = await brandModel.findById(brand);
+    if (!existbrand) {
+      return res.status(404).json({
+        success: false,
+        message: "Brand not found",
       });
     }
 
@@ -117,16 +132,21 @@ const createDress = async (req, res) => {
       stock: totalStock,
       sku,
       status,
-      brandName,
-      brandIcon,
+      brand: existbrand._id,
+
       variants: finalVariants,
     });
 
+    const populatedProduct = await dressModel
+      .findById(createDressData._id)
+      .populate("brand");
+    console.log("CREATED DRESS:", populatedProduct);
     console.log("CREATED DRESS:", createDressData);
 
     return res.status(201).json({
+      success: true,
       message: "Product created successfully",
-      product: createDressData,
+      product: populatedProduct,
     });
   } catch (error) {
     console.log("Error in create dress:", error);
@@ -142,7 +162,7 @@ const createDress = async (req, res) => {
 
 const getProducts = async (req, res) => {
   try {
-    const products = await dressModel.find().sort({ createdAt: -1 });
+    const products = await dressModel.find().populate("brand").sort({ createdAt: -1 });
     res.status(200).json({
       success: true,
       count: products.length,
@@ -157,7 +177,6 @@ const getProducts = async (req, res) => {
     });
   }
 };
-
 
 ///update dres///////////////////////
 
@@ -284,7 +303,7 @@ const deleteDress = async (req, res) => {
 module.exports = {
   createDress,
   getProducts,
-  
+
   // updateDress,
   // getDressByCategory,
   // deleteDress,

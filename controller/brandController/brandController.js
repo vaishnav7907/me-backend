@@ -4,10 +4,23 @@ const cloudinary = require("../../cloudinary/cloudinaryConfig");
 const streamiFier = require("streamifier");
 const createBrand = async (req, res) => {
   try {
-    const { brandName, brandIcon, brandSlogan } = req.body;
+    const { brandName, brandSlogan, brandIcon } = req.body;
 
-    const uploadedImage = [];
-    const imageBuffer = file.imageBuffer;
+    if (!brandName) {
+      return res.status(400).json({
+        success: false,
+        message: "Brand name is required",
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "Brand icon is required",
+      });
+    }
+
+    const imageBuffer = req.file.buffer;
     const optimizeImage = await sharp(imageBuffer)
       .webp({ quality: 80 })
       .toBuffer();
@@ -30,14 +43,46 @@ const createBrand = async (req, res) => {
         },
       );
       streamiFier.createReadStream(optimizeImage).pipe(uploadBrandImage);
-    }
-uploadedImage.push(result.secure_url)
-);
+    });
+
     const brandCreateFn = await brandModel.create({
       brandName,
-      brandIcon,
+      brandIcon: result.secure_url,
       brandSlogan,
     });
-  } catch (error) {}
+
+    return res.status(201).json({
+      success: true,
+      message: "Brand created successfully",
+      brand: brandCreateFn,
+    });
+  } catch (error) {
+    console.log("Create brand error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to create brand",
+      error: error.message,
+    });
+  }
 };
-module.exports = { createBrand };
+
+
+const getBrands= async(req,res)=>{
+  try {
+    const getbrandFn= await brandModel.find().sort({brandName: 1})
+
+      return res.status(200).json({
+      success: true,
+      brand: getbrandFn,
+    });
+  } catch (error) {
+     return res.status(500).json({
+      success: false,
+      message: "Failed to get brands",
+      error: error.message,
+    });
+  }
+}
+
+module.exports = { createBrand ,getBrands};
