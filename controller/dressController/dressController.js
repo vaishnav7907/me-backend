@@ -162,7 +162,10 @@ const createDress = async (req, res) => {
 
 const getProducts = async (req, res) => {
   try {
-    const products = await dressModel.find().populate("brand").sort({ createdAt: -1 });
+    const products = await dressModel
+      .find()
+      .populate("brand")
+      .sort({ createdAt: -1 });
     res.status(200).json({
       success: true,
       count: products.length,
@@ -180,130 +183,109 @@ const getProducts = async (req, res) => {
 
 ///update dres///////////////////////
 
-const updateDress = async (req, res) => {
+const updateProducts = async (req, res) => {
   try {
     const {
       name,
+      description,
+      category,
       price,
       realPrice,
-      brandName,
-      brandIcon,
-      color,
-      colorCode,
-      sizes,
+      brand,
+      variants,
+      sku,
+      status,
     } = req.body;
 
     const { id } = req.params;
 
-    const product = await dressModel.findById(productid);
-    if (!product) {
+    const existProducts = await dressModel.findById(id);
+
+    if (!existProducts) {
       return res.status(404).json({
-        message: "dress not found",
+        success: false,
+        message: "Product not found",
       });
     }
 
-    const variant = product.variants.id(variantid);
-    if (!variant) {
-      return res.status(404).json({ message: "Variant not found" });
+    let updatedVariants = JSON.parse(variants);
+
+    const oldImages = existProducts.variants[0]?.images || [];
+    if (req.files && req.files.length > 0) {
+      const newImages = [];
+
+      for (const file of req.files) {
+        const buffer = await sharp(file.buffer)
+          .webp({ quality: 80 })
+          .toBuffer();
+        const result = await new Promise((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            {
+              folder: "ME/dressess",
+            },
+            (error, result) => {
+              if (error) {
+                reject(error);
+              } else {
+                resolve(result);
+              }
+            },
+          );
+
+          streamFier.createReadStream(buffer).pipe(stream);
+        });
+        newImages.push({
+          url: result.secure_url,
+          publicId: result.public_id,
+        });
+      }
+
+      updatedVariants[0].images = newImages;
     }
 
-    let parsedsizes;
+    const updateData = {
+      name,
+      description,
+      category,
+      price,
+      realPrice,
+      brand,
+      variants: updatedVariants,
+      sku,
+      status,
+    };
+    const updateProductFn = await dressModel.findByIdAndUpdate(id, updateData, {
+      new: true,
+      runValidators: true,
+    });
 
-    try {
-      parsedsizes = JSON.parse(sizes);
-    } catch (error) {
-      return res.status(400).json({ message: "Invalid sizes format" });
+    if (req.files && req.files.length > 0) {
+      for (const image of oldImages) {
+        if (image.publicId) {
+          await cloudinary.uploader.destroy(image.publicId);
+        }
+      }
     }
-    // default old image
-    let uploadedimage = [];
 
-    if (existingDessData.variants && existingDessData.variants.length > 0) {
-      uploadedimage = existingDessData.variants[0].images || [];
-    }
-
-    if (req.file) {
-      // Get image buffer from RAM
-      const imageBuffer = req.file.buffer;
-
-      // optimizeimg
-      const optimizeImg = await sharp(imageBuffer)
-        .webp({
-          quality: 80,
-        })
-        .toBuffer();
-
-      // upload to cloudinary
-
-      const uploadToCloud = await new Promise((resolve, reject) => {
-        const uploadStream = cloudinary.uploader.upload_stream(
-          {
-            folder: "ME/dresses",
-          },
-          (error, result) => {
-            if (error) {
-              reject(error);
-            } else {
-              resolve(result);
-            }
-          },
-        );
-
-        streamFier.createReadStream(optimizeImg).pipe(uploadStream);
-      });
-      image = uploadToCloud.secure_url;
-    }
-    const updt = await dressModel.findByIdAndUpdate(
-      id,
-      {
-        color,
-        size,
-        brandIcon,
-        brandName,
-        realPrize,
-        prize,
-        image,
-        category,
-        name,
-      },
-      { new: true, runValidators: true },
-    );
-
-    res.status(201).json(updt);
+     return res.status(200).json({
+      success: true,
+      message: "Product updated successfully",
+      product: updateProductFn,
+    });
   } catch (error) {
-    console.log("error in update dress", error);
-    res.status(500).json({ message: error });
-  }
-};
+     console.log("UPDATE ERROR:", error);
 
-// get dress by category
-const getDressByCategory = async (req, res) => {
-  try {
-    const { category } = req.params;
-    const getproduct = await dressModel.find({ category });
-    res.status(200).json(getproduct);
-  } catch (error) {
-    console.log("error in get product by category", error);
-
-    res.status(500).json({ message: error.message });
-  }
-};
-
-//delete dress
-const deleteDress = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const deleteDress = await dressModel.findByIdAndDelete(id);
-    res.status(200).json("deleted successfully");
-  } catch (error) {
-    console.log("error in delete dress");
-    res.status(500).json({ message: error.message });
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 
 module.exports = {
   createDress,
   getProducts,
-
+updateProducts
   // updateDress,
   // getDressByCategory,
   // deleteDress,

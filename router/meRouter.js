@@ -4,6 +4,7 @@ const upload = require("../utility/multer");
 const {
   createDress,
   getProducts,
+  updateProducts,
 } = require("../controller/dressController/dressController");
 const {
   userSignUp,
@@ -34,6 +35,9 @@ router.post("/createDress", upload.array("images", 10), createDress);
 // get products
 
 router.get("/getProducts", getProducts);
+
+// update products
+router.patch("updateProduct/:id",upload.array("images",10),updateProducts)
 
 // get new Arrivals
 router.get("/NewArrivals", getNewArrivals);
