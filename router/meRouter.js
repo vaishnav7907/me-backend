@@ -37,7 +37,7 @@ router.post("/createDress", upload.array("images", 10), createDress);
 router.get("/getProducts", getProducts);
 
 // update products
-router.patch("updateProduct/:id",upload.array("images",10),updateProducts)
+router.patch("/updateProduct/:id",upload.array("images",10),updateProducts)
 
 // get new Arrivals
 router.get("/NewArrivals", getNewArrivals);

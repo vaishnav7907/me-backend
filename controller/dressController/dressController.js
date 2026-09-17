@@ -3,6 +3,7 @@ const brandModel = require("../../model/brand/brand");
 const cloudinary = require("../../cloudinary/cloudinaryConfig");
 const sharp = require("sharp");
 const streamFier = require("streamifier");
+const mongoose = require("mongoose");
 ///create dress //////////////////////
 const createDress = async (req, res) => {
   try {
@@ -191,38 +192,50 @@ const updateProducts = async (req, res) => {
       category,
       price,
       realPrice,
+      discount,
       brand,
       variants,
       sku,
       status,
     } = req.body;
-
     const { id } = req.params;
-
-    const existProducts = await dressModel.findById(id);
-
-    if (!existProducts) {
-      return res.status(404).json({
-        success: false,
-        message: "Product not found",
-      });
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid product ID" });
     }
-
+    if (!brand || !mongoose.Types.ObjectId.isValid(brand)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Valid brand is required" });
+    }
+    const existProduct = await dressModel.findById(id);
+    if (!existProduct) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Product not found" });
+    }
+    const existBrand = await brandModel.findById(brand);
+    if (!existBrand) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Brand not found" });
+    }
     let updatedVariants = JSON.parse(variants);
-
-    const oldImages = existProducts.variants[0]?.images || [];
+    if (!Array.isArray(updatedVariants)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid variants" });
+    }
     if (req.files && req.files.length > 0) {
       const newImages = [];
-
       for (const file of req.files) {
         const buffer = await sharp(file.buffer)
           .webp({ quality: 80 })
           .toBuffer();
         const result = await new Promise((resolve, reject) => {
           const stream = cloudinary.uploader.upload_stream(
-            {
-              folder: "ME/dressess",
-            },
+            { folder: "ME/dressess" },
             (error, result) => {
               if (error) {
                 reject(error);
@@ -231,61 +244,52 @@ const updateProducts = async (req, res) => {
               }
             },
           );
-
           streamFier.createReadStream(buffer).pipe(stream);
         });
-        newImages.push({
-          url: result.secure_url,
-          publicId: result.public_id,
-        });
+        newImages.push(result.secure_url);
       }
-
-      updatedVariants[0].images = newImages;
+      if (updatedVariants.length > 0) {
+        updatedVariants[0].images = newImages;
+      }
+    } else {
+      const oldImages = existProduct.variants?.[0]?.images || [];
+      if (updatedVariants.length > 0) {
+        updatedVariants[0].images = oldImages;
+      }
     }
-
     const updateData = {
       name,
       description,
       category,
       price,
       realPrice,
+      discount,
       brand,
       variants: updatedVariants,
       sku,
       status,
     };
-    const updateProductFn = await dressModel.findByIdAndUpdate(id, updateData, {
+    const updatedProduct = await dressModel.findByIdAndUpdate(id, updateData, {
       new: true,
       runValidators: true,
     });
-
-    if (req.files && req.files.length > 0) {
-      for (const image of oldImages) {
-        if (image.publicId) {
-          await cloudinary.uploader.destroy(image.publicId);
-        }
-      }
-    }
-
-     return res.status(200).json({
-      success: true,
-      message: "Product updated successfully",
-      product: updateProductFn,
-    });
+    return res
+      .status(200)
+      .json({
+        success: true,
+        message: "Product updated successfully",
+        product: updatedProduct,
+      });
   } catch (error) {
-     console.log("UPDATE ERROR:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    console.log("UPDATE ERROR:", error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
 module.exports = {
   createDress,
   getProducts,
-updateProducts
+  updateProducts,
   // updateDress,
   // getDressByCategory,
   // deleteDress,
