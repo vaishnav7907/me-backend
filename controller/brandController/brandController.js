@@ -50,7 +50,7 @@ const createBrand = async (req, res) => {
       brandName,
       brandIcon: result.secure_url,
       brandSlogan,
-      status
+      status,
     });
 
     return res.status(201).json({
@@ -84,7 +84,7 @@ const getBrands = async (req, res) => {
           brandName: brand.brandName,
           brandIcon: brand.brandIcon,
           brandSlogan: brand.brandSlogan,
-          status:brand.status,
+          status: brand.status,
           productCount,
         };
       }),
@@ -103,4 +103,92 @@ const getBrands = async (req, res) => {
   }
 };
 
-module.exports = { createBrand, getBrands };
+const updateBrands = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { brandName, brandSlogan, status } = req.body;
+
+    if (!brandName?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Brand name is required",
+      });
+    }
+
+    if (!status) {
+      return res.status(400).json({
+        success: false,
+        message: "Status is required",
+      });
+    }
+
+    const existingBrand = await brandModel.findById(id);
+
+    if (!existingBrand) {
+      return res.status(404).json({
+        success: false,
+        message: "Brand is not found",
+      });
+    }
+
+    const updateData = {
+      brandName: brandName.trim(),
+      brandSlogan: brandSlogan?.trim() || "",
+      status,
+    };
+
+    if (req.file) {
+      const imageBuffer = req.file.buffer;
+
+      const optimizeImage = await sharp(imageBuffer)
+        .webp({ quality: 80 })
+        .toBuffer();
+
+      const result = await new Promise((resolve, reject) => {
+        const uploadBrand = cloudinary.uploader.upload_stream(
+          {
+            folder: "Me/Brands",
+          },
+          (error, result) => {
+            if (error) {
+              console.log("Cloudinary error in brand:", error);
+              reject(error);
+            } else {
+              resolve(result);
+            }
+          }
+        );
+
+        streamiFier
+          .createReadStream(optimizeImage)
+          .pipe(uploadBrand);
+      });
+
+      updateData.brandIcon = result.secure_url;
+    }
+
+    const updateBrandFn = await brandModel.findByIdAndUpdate(
+      id,
+      updateData,
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Brand updated successfully",
+      brand: updateBrandFn,
+    });
+  } catch (error) {
+    console.log("Update brand error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update brand",
+      error: error.message,
+    });
+  }
+};
+module.exports = { createBrand, getBrands, updateBrands };

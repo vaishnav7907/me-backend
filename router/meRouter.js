@@ -17,6 +17,7 @@ const {
 const {
   createBrand,
   getBrands,
+  updateBrands,
 } = require("../controller/brandController/brandController");
 const router = express.Router();
 
@@ -51,5 +52,9 @@ router.post("/createBrand", upload.single("brandIcon"), createBrand);
 // get brand
 
 router.get("/getBrand",getBrands)
+
+// update brands
+
+router.patch("/updateBrands/:id",upload.single("brandIcon"),updateBrands)
 
 module.exports = router;

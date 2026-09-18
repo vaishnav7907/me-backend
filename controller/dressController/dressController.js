@@ -235,7 +235,7 @@ const updateProducts = async (req, res) => {
           .toBuffer();
         const result = await new Promise((resolve, reject) => {
           const stream = cloudinary.uploader.upload_stream(
-            { folder: "ME/dressess" },
+            { folder: "ME/Dressess" },
             (error, result) => {
               if (error) {
                 reject(error);
