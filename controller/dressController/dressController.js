@@ -24,6 +24,7 @@ const createDress = async (req, res) => {
 
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({
+        success: false,
         message: "At least one image is required",
       });
     }
@@ -37,12 +38,14 @@ const createDress = async (req, res) => {
 
     if (!variants) {
       return res.status(400).json({
+        success: false,
         message: "Variants are required",
       });
     }
 
-    const existbrand = await brandModel.findById(brand);
-    if (!existbrand) {
+    const existBrand = await brandModel.findById(brand);
+
+    if (!existBrand) {
       return res.status(404).json({
         success: false,
         message: "Brand not found",
@@ -56,16 +59,16 @@ const createDress = async (req, res) => {
 
       if (!Array.isArray(parsedVariants)) {
         return res.status(400).json({
+          success: false,
           message: "Variants must be an array",
         });
       }
     } catch (error) {
       return res.status(400).json({
+        success: false,
         message: "Invalid variants format",
       });
     }
-
-    console.log("PARSED VARIANTS:", parsedVariants);
 
     const uploadedImage = [];
 
@@ -80,13 +83,13 @@ const createDress = async (req, res) => {
         const uploadStream = cloudinary.uploader.upload_stream(
           {
             folder: "Me/Dresses",
+            resource_type: "image",
           },
           (error, result) => {
             if (error) {
               console.log("Cloudinary error:", error);
               reject(error);
             } else {
-              console.log("Upload success:", result);
               resolve(result);
             }
           },
@@ -95,10 +98,11 @@ const createDress = async (req, res) => {
         streamFier.createReadStream(optimizedImg).pipe(uploadStream);
       });
 
-      uploadedImage.push(result.secure_url);
+      uploadedImage.push({
+        url: result.secure_url,
+        publicId: result.public_id,
+      });
     }
-
-    console.log("UPLOADED IMAGES:", uploadedImage);
 
     const finalVariants = parsedVariants.map((variant) => ({
       color: {
@@ -121,9 +125,6 @@ const createDress = async (req, res) => {
       0,
     );
 
-    console.log("FINAL VARIANTS:", finalVariants);
-    console.log("TOTAL STOCK:", totalStock);
-
     const createDressData = await dressModel.create({
       name,
       description,
@@ -133,16 +134,13 @@ const createDress = async (req, res) => {
       stock: totalStock,
       sku,
       status,
-      brand: existbrand._id,
-
+      brand: existBrand._id,
       variants: finalVariants,
     });
 
     const populatedProduct = await dressModel
       .findById(createDressData._id)
       .populate("brand");
-    console.log("CREATED DRESS:", populatedProduct);
-    console.log("CREATED DRESS:", createDressData);
 
     return res.status(201).json({
       success: true,
@@ -153,13 +151,12 @@ const createDress = async (req, res) => {
     console.log("Error in create dress:", error);
 
     return res.status(500).json({
+      success: false,
       message: "Failed to create product",
       error: error.message,
     });
   }
 };
-
-// get products
 
 const getProducts = async (req, res) => {
   try {
@@ -167,13 +164,14 @@ const getProducts = async (req, res) => {
       .find()
       .populate("brand")
       .sort({ createdAt: -1 });
-    res.status(200).json({
+
+    return res.status(200).json({
       success: true,
       count: products.length,
       products,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Get products error:", error);
 
     return res.status(500).json({
       success: false,
@@ -181,8 +179,6 @@ const getProducts = async (req, res) => {
     });
   }
 };
-
-///update dres///////////////////////
 
 const updateProducts = async (req, res) => {
   try {
@@ -198,65 +194,110 @@ const updateProducts = async (req, res) => {
       sku,
       status,
     } = req.body;
+
     const { id } = req.params;
+
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid product ID" });
+      return res.status(400).json({
+        success: false,
+        message: "Invalid product ID",
+      });
     }
+
     if (!brand || !mongoose.Types.ObjectId.isValid(brand)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Valid brand is required" });
+      return res.status(400).json({
+        success: false,
+        message: "Valid brand is required",
+      });
     }
+
     const existProduct = await dressModel.findById(id);
+
     if (!existProduct) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Product not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
     }
+
     const existBrand = await brandModel.findById(brand);
+
     if (!existBrand) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Brand not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Brand not found",
+      });
     }
-    let updatedVariants = JSON.parse(variants);
+
+    if (!variants) {
+      return res.status(400).json({
+        success: false,
+        message: "Variants are required",
+      });
+    }
+
+    let updatedVariants;
+
+    try {
+      updatedVariants = JSON.parse(variants);
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid variants format",
+      });
+    }
+
     if (!Array.isArray(updatedVariants)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid variants" });
+      return res.status(400).json({
+        success: false,
+        message: "Variants must be an array",
+      });
     }
+
+    const oldImages = existProduct.variants?.[0]?.images || [];
+
     if (req.files && req.files.length > 0) {
       const newImages = [];
+
       for (const file of req.files) {
         const buffer = await sharp(file.buffer)
           .webp({ quality: 80 })
           .toBuffer();
+
         const result = await new Promise((resolve, reject) => {
-          const stream = cloudinary.uploader.upload_stream(
-            { folder: "ME/Dressess" },
+          const uploadStream = cloudinary.uploader.upload_stream(
+            {
+              folder: "Me/Dresses",
+              resource_type: "image",
+            },
             (error, result) => {
               if (error) {
+                console.log("Cloudinary upload error:", error);
                 reject(error);
               } else {
                 resolve(result);
               }
             },
           );
-          streamFier.createReadStream(buffer).pipe(stream);
+
+          streamFier.createReadStream(buffer).pipe(uploadStream);
         });
-        newImages.push(result.secure_url);
+
+        newImages.push({
+          url: result.secure_url,
+          publicId: result.public_id,
+        });
       }
+
       if (updatedVariants.length > 0) {
         updatedVariants[0].images = newImages;
       }
     } else {
-      const oldImages = existProduct.variants?.[0]?.images || [];
       if (updatedVariants.length > 0) {
         updatedVariants[0].images = oldImages;
       }
     }
+
     const updateData = {
       name,
       description,
@@ -264,25 +305,95 @@ const updateProducts = async (req, res) => {
       price,
       realPrice,
       discount,
-      brand,
+      brand: existBrand._id,
       variants: updatedVariants,
       sku,
       status,
     };
+
     const updatedProduct = await dressModel.findByIdAndUpdate(id, updateData, {
       new: true,
       runValidators: true,
     });
-    return res
-      .status(200)
-      .json({
-        success: true,
-        message: "Product updated successfully",
-        product: updatedProduct,
+
+    if (!updatedProduct) {
+      return res.status(404).json({
+        success: false,
+        message: "Product update failed",
       });
+    }
+
+    if (req.files && req.files.length > 0) {
+      for (const oldImage of oldImages) {
+        if (oldImage.publicId) {
+          try {
+            await cloudinary.uploader.destroy(oldImage.publicId, {
+              resource_type: "image",
+            });
+
+            console.log("Deleted old Cloudinary image:", oldImage.publicId);
+          } catch (cloudinaryError) {
+            console.log(
+              "Failed to delete old Cloudinary image:",
+              cloudinaryError,
+            );
+          }
+        }
+      }
+    }
+
+    const populatedProduct = await dressModel
+      .findById(updatedProduct._id)
+      .populate("brand");
+
+    return res.status(200).json({
+      success: true,
+      message: "Product updated successfully",
+      product: populatedProduct,
+    });
   } catch (error) {
-    console.log("UPDATE ERROR:", error);
-    return res.status(500).json({ success: false, message: error.message });
+    console.log("UPDATE PRODUCT ERROR:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update product",
+      error: error.message,
+    });
+  }
+};
+
+const deleteProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const productExists = await dressModel.findById(id);
+
+    if (!productExists) {
+      return res
+        .status(404)
+        .json({ success: false, message: "product doesn't Exist" });
+    }
+
+    for (const variant of productExists.variants) {
+      for (const image of variant.images) {
+        if (image.publicId) {
+          await cloudinary.uploader.destroy(image.publicId);
+        }
+      }
+    }
+
+    await dressModel.findByIdAndDelete(id);
+
+    return res.status(200).json({
+      success: true,
+      message: "Product and Cloudinary images deleted successfully",
+    });
+  } catch (error) {
+    console.log("error in delete product", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete product",
+      error: error.message,
+    });
   }
 };
 
@@ -290,7 +401,5 @@ module.exports = {
   createDress,
   getProducts,
   updateProducts,
-  // updateDress,
-  // getDressByCategory,
-  // deleteDress,
+  deleteProduct
 };

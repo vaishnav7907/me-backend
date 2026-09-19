@@ -9,9 +9,15 @@ const brandSchema = new mongoose.Schema(
     },
 
     brandIcon: {
-      type: String,
-      required: true,
-      default: "",
+      url: {
+        type: String,
+        required: true,
+      },
+
+      publicId: {
+        type: String,
+        required: true,
+      },
     },
 
     brandSlogan: {

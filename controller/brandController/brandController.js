@@ -3,11 +3,12 @@ const dressModel = require("../../model/dress/dress");
 const sharp = require("sharp");
 const cloudinary = require("../../cloudinary/cloudinaryConfig");
 const streamiFier = require("streamifier");
+
 const createBrand = async (req, res) => {
   try {
     const { brandName, brandSlogan, status } = req.body;
 
-    if (!brandName) {
+    if (!brandName?.trim()) {
       return res.status(400).json({
         success: false,
         message: "Brand name is required",
@@ -22,6 +23,7 @@ const createBrand = async (req, res) => {
     }
 
     const imageBuffer = req.file.buffer;
+
     const optimizeImage = await sharp(imageBuffer)
       .webp({ quality: 80 })
       .toBuffer();
@@ -30,27 +32,31 @@ const createBrand = async (req, res) => {
       const uploadBrandImage = cloudinary.uploader.upload_stream(
         {
           folder: "Me/Brands",
+          resource_type: "image",
         },
         (error, result) => {
           if (error) {
-            console.log("cloudinary error in brand", error);
-
+            console.log("Cloudinary error in brand:", error);
             reject(error);
           } else {
-            console.log("brand image uploaded successfull", result);
-
             resolve(result);
           }
         },
       );
+
       streamiFier.createReadStream(optimizeImage).pipe(uploadBrandImage);
     });
 
     const brandCreateFn = await brandModel.create({
-      brandName,
-      brandIcon: result.secure_url,
-      brandSlogan,
-      status,
+      brandName: brandName.trim(),
+
+      brandIcon: {
+        url: result.secure_url,
+        publicId: result.public_id,
+      },
+
+      brandSlogan: brandSlogan?.trim() || "",
+      status: status || "Active",
     });
 
     return res.status(201).json({
@@ -95,6 +101,8 @@ const getBrands = async (req, res) => {
       brand: brandWithCount,
     });
   } catch (error) {
+    console.log("Get brands error:", error);
+
     return res.status(500).json({
       success: false,
       message: "Failed to get brands",
@@ -148,6 +156,7 @@ const updateBrands = async (req, res) => {
         const uploadBrand = cloudinary.uploader.upload_stream(
           {
             folder: "Me/Brands",
+            resource_type: "image",
           },
           (error, result) => {
             if (error) {
@@ -156,25 +165,47 @@ const updateBrands = async (req, res) => {
             } else {
               resolve(result);
             }
-          }
+          },
         );
 
-        streamiFier
-          .createReadStream(optimizeImage)
-          .pipe(uploadBrand);
+        streamiFier.createReadStream(optimizeImage).pipe(uploadBrand);
       });
 
-      updateData.brandIcon = result.secure_url;
-    }
+      updateData.brandIcon = {
+        url: result.secure_url,
+        publicId: result.public_id,
+      };
 
-    const updateBrandFn = await brandModel.findByIdAndUpdate(
-      id,
-      updateData,
-      {
+      const oldPublicId = existingBrand.brandIcon?.publicId;
+
+      const updateBrandFn = await brandModel.findByIdAndUpdate(id, updateData, {
         new: true,
         runValidators: true,
+      });
+
+      if (oldPublicId) {
+        try {
+          await cloudinary.uploader.destroy(oldPublicId, {
+            resource_type: "image",
+          });
+
+          console.log("Old brand image deleted:", oldPublicId);
+        } catch (deleteError) {
+          console.log("Failed to delete old brand image:", deleteError);
+        }
       }
-    );
+
+      return res.status(200).json({
+        success: true,
+        message: "Brand updated successfully",
+        brand: updateBrandFn,
+      });
+    }
+
+    const updateBrandFn = await brandModel.findByIdAndUpdate(id, updateData, {
+      new: true,
+      runValidators: true,
+    });
 
     return res.status(200).json({
       success: true,
@@ -191,4 +222,9 @@ const updateBrands = async (req, res) => {
     });
   }
 };
-module.exports = { createBrand, getBrands, updateBrands };
+
+module.exports = {
+  createBrand,
+  getBrands,
+  updateBrands,
+};

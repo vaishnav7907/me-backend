@@ -5,6 +5,7 @@ const {
   createDress,
   getProducts,
   updateProducts,
+  deleteProduct,
 } = require("../controller/dressController/dressController");
 const {
   userSignUp,
@@ -56,5 +57,7 @@ router.get("/getBrand",getBrands)
 // update brands
 
 router.patch("/updateBrands/:id",upload.single("brandIcon"),updateBrands)
+
+router.delete("/deleteProduct/:id",deleteProduct)
 
 module.exports = router;
