@@ -5,10 +5,20 @@ const latestShrtSchema = new mongoose.Schema(
     name: { type: String, default: "" },
     category: {
       type: String,
-      enum: ["Shirts", "Pants", "Jackets"],
+      enum: ["Shirts", "Pants", "Jackets", "Innerwear", "Shorts", "T-Shirts"],
       required: true,
     },
-    image: { type: String, default: "" },
+    arrivalsCategoryImage: {
+      url: {
+        type: String,
+        required: true,
+      },
+
+      publicId: {
+        type: String,
+        required: true,
+      },
+    },
     description: { type: String, default: "" },
   },
   { timestamps: true },

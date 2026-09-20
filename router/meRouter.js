@@ -14,6 +14,7 @@ const {
 } = require("../controller/authController/authenticationController");
 const {
   getNewArrivals,
+  createLatestArrivals,
 } = require("../controller/newarrivalController/newArrivalsController");
 const {
   createBrand,
@@ -66,5 +67,10 @@ router.patch("/updateBrands/:id", upload.single("brandIcon"), updateBrands);
 // delete brands
 
 router.delete("/deleteBrand/:id", deleteBrands);
+
+
+// latest arrivals
+
+router.post("/createLatestArrivals",upload.single("latestArrivals"),createLatestArrivals)
 
 module.exports = router;
