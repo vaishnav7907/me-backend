@@ -19,6 +19,7 @@ const {
   createBrand,
   getBrands,
   updateBrands,
+  deleteBrands,
 } = require("../controller/brandController/brandController");
 const router = express.Router();
 
@@ -39,7 +40,11 @@ router.post("/createDress", upload.array("images", 10), createDress);
 router.get("/getProducts", getProducts);
 
 // update products
-router.patch("/updateProduct/:id",upload.array("images",10),updateProducts)
+router.patch("/updateProduct/:id", upload.array("images", 10), updateProducts);
+
+// delete product
+
+router.delete("/deleteProduct/:id", deleteProduct);
 
 // get new Arrivals
 router.get("/NewArrivals", getNewArrivals);
@@ -52,12 +57,14 @@ router.post("/createBrand", upload.single("brandIcon"), createBrand);
 
 // get brand
 
-router.get("/getBrand",getBrands)
+router.get("/getBrand", getBrands);
 
 // update brands
 
-router.patch("/updateBrands/:id",upload.single("brandIcon"),updateBrands)
+router.patch("/updateBrands/:id", upload.single("brandIcon"), updateBrands);
 
-router.delete("/deleteProduct/:id",deleteProduct)
+// delete brands
+
+router.delete("/deleteBrand/:id", deleteBrands);
 
 module.exports = router;

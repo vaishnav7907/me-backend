@@ -223,8 +223,52 @@ const updateBrands = async (req, res) => {
   }
 };
 
+const deleteBrands = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const existingBrand = await brandModel.findById(id);
+
+    if (!existingBrand) {
+      return res
+        .status(404)
+        .json({ success: false, message: " this brand doesn't exist" });
+    }
+
+    const productCount = await dressModel.countDocuments({
+      brand: id,
+    });
+
+    if (productCount > 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot delete this brand because products are using it",
+        productCount,
+      });
+    }
+
+    if (existingBrand.brandIcon?.publicId) {
+      await cloudinary.uploader.destroy(existingBrand.brandIcon.publicId);
+    }
+
+    await brandModel.findByIdAndDelete(id);
+    return res.status(200).json({
+      success: true,
+      message: "Brand and brand image deleted successfully",
+    });
+  } catch (error) {
+    console.log("error in delete brands", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete brands",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createBrand,
   getBrands,
   updateBrands,
+  deleteBrands,
 };
