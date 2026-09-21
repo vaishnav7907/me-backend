@@ -215,7 +215,7 @@ const updateLatestArrivals = async (req, res) => {
             if (error) {
               reject(error);
             } else {
-              resolve(result)
+              resolve(result);
             }
           },
         );
@@ -223,8 +223,7 @@ const updateLatestArrivals = async (req, res) => {
         streamiFier.createReadStream(optimizeImage).pipe(uploadLatestArrivals);
       });
 
-      oldPublicId =
-        existingLatestArrivals.arrivalsCategoryImage?.publicId;
+      oldPublicId = existingLatestArrivals.arrivalsCategoryImage?.publicId;
       updateLataestArrivalsData.arrivalsCategoryImage = {
         url: result.secure_url,
         publicId: result.public_id,
@@ -234,7 +233,7 @@ const updateLatestArrivals = async (req, res) => {
     const updateLatestArrivals = await latestArrivalsModel.findByIdAndUpdate(
       id,
       updateLataestArrivalsData,
-      { new: true, runValidators: true },
+      { returnDocument: "after", runValidators: true },
     );
 
     if (oldPublicId) {
@@ -249,7 +248,7 @@ const updateLatestArrivals = async (req, res) => {
       }
     }
 
-    return res.status(200).json({
+    return res.status(201).json({
       success: true,
       message: "Latest arrival updated successfully",
       latestArrivals: updateLatestArrivals,
@@ -269,5 +268,5 @@ module.exports = {
   createLatestArrivals,
   getLatestArrivals,
   deleteLatestArrivals,
-  updateLatestArrivals
+  updateLatestArrivals,
 };
