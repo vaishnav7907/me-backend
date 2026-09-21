@@ -145,10 +145,10 @@ const updateBrands = async (req, res) => {
       status,
     };
 
-    if (req.file) {
-      const imageBuffer = req.file.buffer;
+    let oldPublicId = null;
 
-      const optimizeImage = await sharp(imageBuffer)
+    if (req.file) {
+      const optimizeImage = await sharp(req.file.buffer)
         .webp({ quality: 80 })
         .toBuffer();
 
@@ -160,7 +160,6 @@ const updateBrands = async (req, res) => {
           },
           (error, result) => {
             if (error) {
-              console.log("Cloudinary error in brand:", error);
               reject(error);
             } else {
               resolve(result);
@@ -171,41 +170,30 @@ const updateBrands = async (req, res) => {
         streamiFier.createReadStream(optimizeImage).pipe(uploadBrand);
       });
 
+      oldPublicId = existingBrand.brandIcon?.publicId;
+
       updateData.brandIcon = {
         url: result.secure_url,
         publicId: result.public_id,
       };
-
-      const oldPublicId = existingBrand.brandIcon?.publicId;
-
-      const updateBrandFn = await brandModel.findByIdAndUpdate(id, updateData, {
-        new: true,
-        runValidators: true,
-      });
-
-      if (oldPublicId) {
-        try {
-          await cloudinary.uploader.destroy(oldPublicId, {
-            resource_type: "image",
-          });
-
-          console.log("Old brand image deleted:", oldPublicId);
-        } catch (deleteError) {
-          console.log("Failed to delete old brand image:", deleteError);
-        }
-      }
-
-      return res.status(200).json({
-        success: true,
-        message: "Brand updated successfully",
-        brand: updateBrandFn,
-      });
     }
 
     const updateBrandFn = await brandModel.findByIdAndUpdate(id, updateData, {
       new: true,
       runValidators: true,
     });
+
+    if (oldPublicId) {
+      try {
+        await cloudinary.uploader.destroy(oldPublicId, {
+          resource_type: "image",
+        });
+
+        console.log("Old brand image deleted:", oldPublicId);
+      } catch (deleteError) {
+        console.log("Failed to delete old brand image:", deleteError);
+      }
+    }
 
     return res.status(200).json({
       success: true,

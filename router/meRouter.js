@@ -15,6 +15,9 @@ const {
 const {
   getNewArrivals,
   createLatestArrivals,
+  getLatestArrivals,
+  deleteLatestArrivals,
+  updateLatestArrivals,
 } = require("../controller/newarrivalController/newArrivalsController");
 const {
   createBrand,
@@ -68,9 +71,27 @@ router.patch("/updateBrands/:id", upload.single("brandIcon"), updateBrands);
 
 router.delete("/deleteBrand/:id", deleteBrands);
 
-
 // latest arrivals
 
-router.post("/createLatestArrivals",upload.single("latestArrivals"),createLatestArrivals)
+router.post(
+  "/createLatestArrivals",
+  upload.single("latestArrivals"),
+  createLatestArrivals,
+);
+
+// get latest arrivals
+
+router.get("/latestArrivals", getLatestArrivals);
+
+// delete latest arrivals
+
+router.delete("/deleteLatestArrivals/:id", deleteLatestArrivals);
+// update latest arrivals
+
+router.patch(
+  "/updateLatestArrivals/:id",
+  upload.single("latestArrivals"),
+  updateLatestArrivals,
+);
 
 module.exports = router;
