@@ -25,6 +25,8 @@ const {
   updateBrands,
   deleteBrands,
 } = require("../controller/brandController/brandController");
+const { getShirtsByCategory } = require("../controller/getProductsByCategory/GetProductsByCategory");
+
 const router = express.Router();
 
 // authentication user and admin
@@ -94,4 +96,7 @@ router.patch(
   updateLatestArrivals,
 );
 
+// get products by category
+
+router.get("/getProductsByCategory/:category", getShirtsByCategory);
 module.exports = router;
