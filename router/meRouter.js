@@ -25,7 +25,9 @@ const {
   updateBrands,
   deleteBrands,
 } = require("../controller/brandController/brandController");
-const { getShirtsByCategory } = require("../controller/getProductsByCategory/GetProductsByCategory");
+const {
+  getShirtsByCategory,
+} = require("../controller/getProductsByCategory/GetProductsByCategory");
 
 const router = express.Router();
 
@@ -59,7 +61,20 @@ router.get("/NewArrivals", getNewArrivals);
 
 // create brand
 
-router.post("/createBrand", upload.single("brandIcon"), createBrand);
+router.post(
+  "/createBrand",
+  upload.fields([
+    {
+      name: "brandIcon",
+      maxCount: 1,
+    },
+    {
+      name: "brandImage",
+      maxCount: 1,
+    },
+  ]),
+  createBrand,
+);
 
 // get brand
 
@@ -67,7 +82,20 @@ router.get("/getBrand", getBrands);
 
 // update brands
 
-router.patch("/updateBrands/:id", upload.single("brandIcon"), updateBrands);
+router.patch(
+  "/updateBrands/:id",
+  upload.fields([
+    {
+      name: "brandIcon",
+      maxCount: 1,
+    },
+    {
+      name: "brandImage",
+      maxCount: 1,
+    },
+  ]),
+  updateBrands,
+);
 
 // delete brands
 

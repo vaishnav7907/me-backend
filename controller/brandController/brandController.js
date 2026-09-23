@@ -15,28 +15,40 @@ const createBrand = async (req, res) => {
       });
     }
 
-    if (!req.file) {
+    if (!req.files?.brandIcon?.[0]) {
       return res.status(400).json({
         success: false,
         message: "Brand icon is required",
       });
     }
 
-    const imageBuffer = req.file.buffer;
+    if (!req.files?.brandImage?.[0]) {
+      return res.status(400).json({
+        success: false,
+        message: "Brand image is required",
+      });
+    }
 
-    const optimizeImage = await sharp(imageBuffer)
+    const brandIconFile = req.files.brandIcon[0];
+    const brandImageFile = req.files.brandImage[0];
+
+    const optimizeBrandIcon = await sharp(brandIconFile.buffer)
       .webp({ quality: 80 })
       .toBuffer();
 
-    const result = await new Promise((resolve, reject) => {
-      const uploadBrandImage = cloudinary.uploader.upload_stream(
+    const optimizeBrandImage = await sharp(brandImageFile.buffer)
+      .webp({ quality: 80 })
+      .toBuffer();
+
+    const brandIconResult = await new Promise((resolve, reject) => {
+      const uploadBrandIcon = cloudinary.uploader.upload_stream(
         {
-          folder: "Me/Brands",
+          folder: "Me/Brands/Icons",
           resource_type: "image",
         },
         (error, result) => {
           if (error) {
-            console.log("Cloudinary error in brand:", error);
+            console.log("Cloudinary error in brand icon:", error);
             reject(error);
           } else {
             resolve(result);
@@ -44,15 +56,39 @@ const createBrand = async (req, res) => {
         },
       );
 
-      streamiFier.createReadStream(optimizeImage).pipe(uploadBrandImage);
+      streamiFier.createReadStream(optimizeBrandIcon).pipe(uploadBrandIcon);
+    });
+
+    const brandImageResult = await new Promise((resolve, reject) => {
+      const uploadBrandImage = cloudinary.uploader.upload_stream(
+        {
+          folder: "Me/Brands/Images",
+          resource_type: "image",
+        },
+        (error, result) => {
+          if (error) {
+            console.log("Cloudinary error in brand image:", error);
+            reject(error);
+          } else {
+            resolve(result);
+          }
+        },
+      );
+
+      streamiFier.createReadStream(optimizeBrandImage).pipe(uploadBrandImage);
     });
 
     const brandCreateFn = await brandModel.create({
       brandName: brandName.trim(),
 
       brandIcon: {
-        url: result.secure_url,
-        publicId: result.public_id,
+        url: brandIconResult.secure_url,
+        publicId: brandIconResult.public_id,
+      },
+
+      brandImage: {
+        url: brandImageResult.secure_url,
+        publicId: brandImageResult.public_id,
       },
 
       brandSlogan: brandSlogan?.trim() || "",
@@ -90,6 +126,7 @@ const getBrands = async (req, res) => {
           brandName: brand.brandName,
           brandIcon: brand.brandIcon,
           brandSlogan: brand.brandSlogan,
+          brandImage: brand.brandImage,
           status: brand.status,
           productCount,
         };
@@ -145,21 +182,25 @@ const updateBrands = async (req, res) => {
       status,
     };
 
-    let oldPublicId = null;
+    let oldIconPublicId = null;
+    let oldImagePublicId = null;
 
-    if (req.file) {
-      const optimizeImage = await sharp(req.file.buffer)
+    if (req.files?.brandIcon?.[0]) {
+      const brandIconFile = req.files.brandIcon[0];
+
+      const optimizeBrandIcon = await sharp(brandIconFile.buffer)
         .webp({ quality: 80 })
         .toBuffer();
 
-      const result = await new Promise((resolve, reject) => {
-        const uploadBrand = cloudinary.uploader.upload_stream(
+      const brandIconResult = await new Promise((resolve, reject) => {
+        const uploadBrandIcon = cloudinary.uploader.upload_stream(
           {
-            folder: "Me/Brands",
+            folder: "Me/Brands/Icons",
             resource_type: "image",
           },
           (error, result) => {
             if (error) {
+              console.log("Cloudinary error in brand icon:", error);
               reject(error);
             } else {
               resolve(result);
@@ -167,14 +208,48 @@ const updateBrands = async (req, res) => {
           },
         );
 
-        streamiFier.createReadStream(optimizeImage).pipe(uploadBrand);
+        streamiFier.createReadStream(optimizeBrandIcon).pipe(uploadBrandIcon);
       });
 
-      oldPublicId = existingBrand.brandIcon?.publicId;
+      oldIconPublicId = existingBrand.brandIcon?.publicId;
 
       updateData.brandIcon = {
-        url: result.secure_url,
-        publicId: result.public_id,
+        url: brandIconResult.secure_url,
+        publicId: brandIconResult.public_id,
+      };
+    }
+
+    if (req.files?.brandImage?.[0]) {
+      const brandImageFile = req.files.brandImage[0];
+
+      const optimizeBrandImage = await sharp(brandImageFile.buffer)
+        .webp({ quality: 80 })
+        .toBuffer();
+
+      const brandImageResult = await new Promise((resolve, reject) => {
+        const uploadBrandImage = cloudinary.uploader.upload_stream(
+          {
+            folder: "Me/Brands/Images",
+            resource_type: "image",
+          },
+          (error, result) => {
+            if (error) {
+              console.log("Cloudinary error in brand image:", error);
+              reject(error);
+            } else {
+              resolve(result);
+            }
+          },
+        );
+
+        streamiFier.createReadStream(optimizeBrandImage).pipe(uploadBrandImage);
+      });
+
+      oldImagePublicId = existingBrand.brandImage?.publicId;
+
+      updateData.brandImage = {
+        url: brandImageResult.secure_url,
+        publicId: brandImageResult.public_id,
       };
     }
 
@@ -183,13 +258,25 @@ const updateBrands = async (req, res) => {
       runValidators: true,
     });
 
-    if (oldPublicId) {
+    if (oldIconPublicId) {
       try {
-        await cloudinary.uploader.destroy(oldPublicId, {
+        await cloudinary.uploader.destroy(oldIconPublicId, {
           resource_type: "image",
         });
 
-        console.log("Old brand image deleted:", oldPublicId);
+        console.log("Old brand icon deleted:", oldIconPublicId);
+      } catch (deleteError) {
+        console.log("Failed to delete old brand icon:", deleteError);
+      }
+    }
+
+    if (oldImagePublicId) {
+      try {
+        await cloudinary.uploader.destroy(oldImagePublicId, {
+          resource_type: "image",
+        });
+
+        console.log("Old brand image deleted:", oldImagePublicId);
       } catch (deleteError) {
         console.log("Failed to delete old brand image:", deleteError);
       }
@@ -218,9 +305,10 @@ const deleteBrands = async (req, res) => {
     const existingBrand = await brandModel.findById(id);
 
     if (!existingBrand) {
-      return res
-        .status(404)
-        .json({ success: false, message: " this brand doesn't exist" });
+      return res.status(404).json({
+        success: false,
+        message: "This brand doesn't exist",
+      });
     }
 
     const productCount = await dressModel.countDocuments({
@@ -236,19 +324,41 @@ const deleteBrands = async (req, res) => {
     }
 
     if (existingBrand.brandIcon?.publicId) {
-      await cloudinary.uploader.destroy(existingBrand.brandIcon.publicId);
+      try {
+        await cloudinary.uploader.destroy(existingBrand.brandIcon.publicId, {
+          resource_type: "image",
+        });
+
+        console.log("Brand icon deleted:", existingBrand.brandIcon.publicId);
+      } catch (error) {
+        console.log("Failed to delete brand icon:", error);
+      }
+    }
+
+    if (existingBrand.brandImage?.publicId) {
+      try {
+        await cloudinary.uploader.destroy(existingBrand.brandImage.publicId, {
+          resource_type: "image",
+        });
+
+        console.log("Brand image deleted:", existingBrand.brandImage.publicId);
+      } catch (error) {
+        console.log("Failed to delete brand image:", error);
+      }
     }
 
     await brandModel.findByIdAndDelete(id);
+
     return res.status(200).json({
       success: true,
-      message: "Brand and brand image deleted successfully",
+      message: "Brand deleted successfully",
     });
   } catch (error) {
-    console.log("error in delete brands", error);
+    console.log("Error in delete brands:", error);
+
     return res.status(500).json({
       success: false,
-      message: "Failed to delete brands",
+      message: "Failed to delete brand",
       error: error.message,
     });
   }
