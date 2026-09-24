@@ -17,9 +17,11 @@ const createDress = async (req, res) => {
       price,
       realPrice,
       brand,
+      details,
       variants,
       sku,
       status,
+      discount,
     } = req.body;
 
     if (!req.files || req.files.length === 0) {
@@ -52,10 +54,15 @@ const createDress = async (req, res) => {
       });
     }
 
+    // =========================
+    // PARSE VARIANTS
+    // =========================
+
     let parsedVariants;
 
     try {
-      parsedVariants = JSON.parse(variants);
+      parsedVariants =
+        typeof variants === "string" ? JSON.parse(variants) : variants;
 
       if (!Array.isArray(parsedVariants)) {
         return res.status(400).json({
@@ -69,6 +76,35 @@ const createDress = async (req, res) => {
         message: "Invalid variants format",
       });
     }
+
+    // =========================
+    // PARSE DETAILS
+    // =========================
+
+    let parsedDetails = {};
+
+    if (details) {
+      try {
+        parsedDetails =
+          typeof details === "string" ? JSON.parse(details) : details;
+
+        if (typeof parsedDetails !== "object" || Array.isArray(parsedDetails)) {
+          return res.status(400).json({
+            success: false,
+            message: "Details must be an object",
+          });
+        }
+      } catch (error) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid details format",
+        });
+      }
+    }
+
+    // =========================
+    // UPLOAD IMAGES
+    // =========================
 
     const uploadedImage = [];
 
@@ -104,6 +140,10 @@ const createDress = async (req, res) => {
       });
     }
 
+    // =========================
+    // CREATE VARIANTS
+    // =========================
+
     const finalVariants = parsedVariants.map((variant) => ({
       color: {
         name: variant.color.name,
@@ -114,9 +154,13 @@ const createDress = async (req, res) => {
 
       sizes: variant.sizes.map((size) => ({
         size: size.size,
-        stock: Number(size.stock),
+        stock: Number(size.stock) || 0,
       })),
     }));
+
+    // =========================
+    // TOTAL STOCK
+    // =========================
 
     const totalStock = finalVariants.reduce(
       (total, variant) =>
@@ -125,18 +169,30 @@ const createDress = async (req, res) => {
       0,
     );
 
+    // =========================
+    // CREATE PRODUCT
+    // =========================
+
     const createDressData = await dressModel.create({
       name,
       description,
       category,
-      price,
-      realPrice,
+      price: Number(price),
+      realPrice: Number(realPrice),
+      discount: Number(discount) || 0,
       stock: totalStock,
-      sku,
+      sku: sku?.trim().toUpperCase(),
       status,
       brand: existBrand._id,
+
+      details: parsedDetails,
+
       variants: finalVariants,
     });
+
+    // =========================
+    // POPULATE BRAND
+    // =========================
 
     const populatedProduct = await dressModel
       .findById(createDressData._id)
@@ -190,6 +246,7 @@ const updateProducts = async (req, res) => {
       realPrice,
       discount,
       brand,
+      details,
       variants,
       sku,
       status,
@@ -234,6 +291,27 @@ const updateProducts = async (req, res) => {
         success: false,
         message: "Variants are required",
       });
+    }
+
+    let parsedDetails = {};
+
+    if (details) {
+      try {
+        parsedDetails =
+          typeof details === "string" ? JSON.parse(details) : details;
+
+        if (typeof parsedDetails !== "object" || Array.isArray(parsedDetails)) {
+          return res.status(400).json({
+            success: false,
+            message: "Details must be an object",
+          });
+        }
+      } catch (error) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid details format",
+        });
+      }
     }
 
     let updatedVariants;
@@ -307,6 +385,7 @@ const updateProducts = async (req, res) => {
       discount,
       brand: existBrand._id,
       variants: updatedVariants,
+      details: parsedDetails,
       sku,
       status,
     };
@@ -401,5 +480,5 @@ module.exports = {
   createDress,
   getProducts,
   updateProducts,
-  deleteProduct
+  deleteProduct,
 };

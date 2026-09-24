@@ -2,15 +2,15 @@ const mongoose = require("mongoose");
 
 const dressSchema = new mongoose.Schema(
   {
-
+    // =========================
+    // BASIC INFORMATION
+    // =========================
 
     name: {
       type: String,
       required: true,
       trim: true,
     },
-
-   
 
     description: {
       type: String,
@@ -24,15 +24,48 @@ const dressSchema = new mongoose.Schema(
       enum: ["Shirts", "Pants", "Jackets", "Innerwear", "Shorts", "T-Shirts"],
     },
 
+    brand: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "brand",
+      required: true,
+    },
+
+    // =========================
+    // PRICING
+    // =========================
+
     price: {
       type: Number,
       required: true,
+      min: 0,
     },
 
     realPrice: {
       type: Number,
       required: true,
+      min: 0,
     },
+
+    discount: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100,
+    },
+
+    // =========================
+    // STOCK
+    // =========================
+
+    stock: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    // =========================
+    // PRODUCT IDENTIFICATION
+    // =========================
 
     sku: {
       type: String,
@@ -42,16 +75,29 @@ const dressSchema = new mongoose.Schema(
       uppercase: true,
     },
 
+    // =========================
+    // STATUS
+    // =========================
+
     status: {
       type: String,
       enum: ["Active", "Inactive", "Draft"],
       default: "Draft",
     },
 
-    brand: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "brand",
+    // =========================
+    // PRODUCT DETAILS
+    // =========================
+
+    details: {
+      type: Map,
+      of: { type: String, trim: true },
+      default: {},
     },
+
+    // =========================
+    // PRODUCT VARIANTS
+    // =========================
 
     variants: [
       {
@@ -66,6 +112,7 @@ const dressSchema = new mongoose.Schema(
             type: String,
             required: true,
             trim: true,
+            default: "#000000",
           },
         },
 
@@ -87,7 +134,24 @@ const dressSchema = new mongoose.Schema(
           {
             size: {
               type: String,
-              enum: ["XS", "S", "M", "L", "XL", "XXL"],
+              required: true,
+              enum: [
+                "XS",
+                "S",
+                "M",
+                "L",
+                "XL",
+                "XXL",
+                "28",
+                "30",
+                "32",
+                "34",
+                "36",
+                "38",
+                "40",
+                "42",
+                "44",
+              ],
             },
 
             stock: {
