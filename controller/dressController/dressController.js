@@ -261,13 +261,6 @@ const updateProducts = async (req, res) => {
       });
     }
 
-    if (!brand || !mongoose.Types.ObjectId.isValid(brand)) {
-      return res.status(400).json({
-        success: false,
-        message: "Valid brand is required",
-      });
-    }
-
     const existProduct = await dressModel.findById(id);
 
     if (!existProduct) {
@@ -277,25 +270,29 @@ const updateProducts = async (req, res) => {
       });
     }
 
-    const existBrand = await brandModel.findById(brand);
+    let existBrand = null;
 
-    if (!existBrand) {
-      return res.status(404).json({
-        success: false,
-        message: "Brand not found",
-      });
+    if (brand) {
+      if (!mongoose.Types.ObjectId.isValid(brand)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid brand ID",
+        });
+      }
+
+      existBrand = await brandModel.findById(brand);
+
+      if (!existBrand) {
+        return res.status(404).json({
+          success: false,
+          message: "Brand not found",
+        });
+      }
     }
 
-    if (!variants) {
-      return res.status(400).json({
-        success: false,
-        message: "Variants are required",
-      });
-    }
+    let parsedDetails;
 
-    let parsedDetails = {};
-
-    if (details) {
+    if (details !== undefined && details !== "") {
       try {
         parsedDetails =
           typeof details === "string" ? JSON.parse(details) : details;
@@ -316,82 +313,119 @@ const updateProducts = async (req, res) => {
 
     let updatedVariants;
 
-    try {
-      updatedVariants = JSON.parse(variants);
-    } catch (error) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid variants format",
-      });
-    }
+    if (variants !== undefined && variants !== "") {
+      try {
+        updatedVariants =
+          typeof variants === "string" ? JSON.parse(variants) : variants;
+      } catch (error) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid variants format",
+        });
+      }
 
-    if (!Array.isArray(updatedVariants)) {
-      return res.status(400).json({
-        success: false,
-        message: "Variants must be an array",
-      });
+      if (!Array.isArray(updatedVariants)) {
+        return res.status(400).json({
+          success: false,
+          message: "Variants must be an array",
+        });
+      }
     }
 
     const oldImages = existProduct.variants?.[0]?.images || [];
 
-    if (req.files && req.files.length > 0) {
-      const newImages = [];
+    if (updatedVariants) {
+      if (req.files && req.files.length > 0) {
+        const newImages = [];
 
-      for (const file of req.files) {
-        const buffer = await sharp(file.buffer)
-          .webp({ quality: 80 })
-          .toBuffer();
+        for (const file of req.files) {
+          const buffer = await sharp(file.buffer)
+            .webp({ quality: 80 })
+            .toBuffer();
 
-        const result = await new Promise((resolve, reject) => {
-          const uploadStream = cloudinary.uploader.upload_stream(
-            {
-              folder: "Me/Dresses",
-              resource_type: "image",
-            },
-            (error, result) => {
-              if (error) {
-                console.log("Cloudinary upload error:", error);
-                reject(error);
-              } else {
-                resolve(result);
-              }
-            },
-          );
+          const result = await new Promise((resolve, reject) => {
+            const uploadStream = cloudinary.uploader.upload_stream(
+              {
+                folder: "Me/Dresses",
+                resource_type: "image",
+              },
+              (error, result) => {
+                if (error) {
+                  console.log("Cloudinary upload error:", error);
+                  reject(error);
+                } else {
+                  resolve(result);
+                }
+              },
+            );
 
-          streamFier.createReadStream(buffer).pipe(uploadStream);
-        });
+            streamFier.createReadStream(buffer).pipe(uploadStream);
+          });
 
-        newImages.push({
-          url: result.secure_url,
-          publicId: result.public_id,
-        });
-      }
+          newImages.push({
+            url: result.secure_url,
+            publicId: result.public_id,
+          });
+        }
 
-      if (updatedVariants.length > 0) {
-        updatedVariants[0].images = newImages;
-      }
-    } else {
-      if (updatedVariants.length > 0) {
-        updatedVariants[0].images = oldImages;
+        if (updatedVariants.length > 0) {
+          updatedVariants[0].images = newImages;
+        }
+      } else {
+        if (updatedVariants.length > 0) {
+          updatedVariants[0].images = oldImages;
+        }
       }
     }
 
-    const updateData = {
-      name,
-      description,
-      category,
-      price,
-      realPrice,
-      discount,
-      brand: existBrand._id,
-      variants: updatedVariants,
-      details: parsedDetails,
-      sku,
-      status,
-    };
+    const updateData = {};
+
+    if (name !== undefined && name !== "") {
+      updateData.name = name;
+    }
+
+    if (description !== undefined && description !== "") {
+      updateData.description = description;
+    }
+
+    if (category !== undefined && category !== "") {
+      updateData.category = category;
+    }
+
+    if (price !== undefined && price !== "") {
+      updateData.price = price;
+    }
+
+    if (realPrice !== undefined && realPrice !== "") {
+      updateData.realPrice = realPrice;
+    }
+
+    if (discount !== undefined && discount !== "") {
+      updateData.discount = discount;
+    }
+
+    if (existBrand) {
+      updateData.brand = existBrand._id;
+    }
+
+    if (parsedDetails !== undefined) {
+      updateData.details = parsedDetails;
+    }
+
+    if (updatedVariants !== undefined) {
+      updateData.variants = updatedVariants;
+    }
+
+    if (sku !== undefined && sku !== "") {
+      updateData.sku = sku;
+    }
+
+    if (status !== undefined && status !== "") {
+      updateData.status = status;
+    }
 
     const updatedProduct = await dressModel.findByIdAndUpdate(id, updateData, {
-      new: true,
+      returnDocument: "after",
       runValidators: true,
     });
 

@@ -151,21 +151,14 @@ const getBrands = async (req, res) => {
 const updateBrands = async (req, res) => {
   try {
     const { id } = req.params;
-    const { brandName, brandSlogan, status } = req.body;
 
-    if (!brandName?.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: "Brand name is required",
-      });
-    }
-
-    if (!status) {
-      return res.status(400).json({
-        success: false,
-        message: "Status is required",
-      });
-    }
+    const {
+      brandName,
+      brandSlogan,
+      status,
+      removeBrandIcon,
+      removeBrandBackground,
+    } = req.body;
 
     const existingBrand = await brandModel.findById(id);
 
@@ -176,11 +169,7 @@ const updateBrands = async (req, res) => {
       });
     }
 
-    const updateData = {
-      brandName: brandName.trim(),
-      brandSlogan: brandSlogan?.trim() || "",
-      status,
-    };
+    const updateData = {};
 
     let oldIconPublicId = null;
     let oldImagePublicId = null;
@@ -200,7 +189,6 @@ const updateBrands = async (req, res) => {
           },
           (error, result) => {
             if (error) {
-              console.log("Cloudinary error in brand icon:", error);
               reject(error);
             } else {
               resolve(result);
@@ -234,7 +222,6 @@ const updateBrands = async (req, res) => {
           },
           (error, result) => {
             if (error) {
-              console.log("Cloudinary error in brand image:", error);
               reject(error);
             } else {
               resolve(result);
@@ -253,8 +240,30 @@ const updateBrands = async (req, res) => {
       };
     }
 
+    if (brandName !== undefined && brandName !== "") {
+      updateData.brandName = brandName;
+    }
+
+    if (brandSlogan !== undefined) {
+      updateData.brandSlogan = brandSlogan;
+    }
+
+    if (status !== undefined && status !== "") {
+      updateData.status = status;
+    }
+
+    if (removeBrandIcon === "true" && !req.files?.brandIcon?.[0]) {
+      updateData.brandIcon = null;
+      oldIconPublicId = existingBrand.brandIcon?.publicId;
+    }
+
+    if (removeBrandBackground === "true" && !req.files?.brandImage?.[0]) {
+      updateData.brandImage = null;
+      oldImagePublicId = existingBrand.brandImage?.publicId;
+    }
+
     const updateBrandFn = await brandModel.findByIdAndUpdate(id, updateData, {
-      new: true,
+      returnDocument: "after",
       runValidators: true,
     });
 
@@ -263,10 +272,8 @@ const updateBrands = async (req, res) => {
         await cloudinary.uploader.destroy(oldIconPublicId, {
           resource_type: "image",
         });
-
-        console.log("Old brand icon deleted:", oldIconPublicId);
-      } catch (deleteError) {
-        console.log("Failed to delete old brand icon:", deleteError);
+      } catch (error) {
+        console.log("Failed to delete old brand icon:", error);
       }
     }
 
@@ -275,10 +282,8 @@ const updateBrands = async (req, res) => {
         await cloudinary.uploader.destroy(oldImagePublicId, {
           resource_type: "image",
         });
-
-        console.log("Old brand image deleted:", oldImagePublicId);
-      } catch (deleteError) {
-        console.log("Failed to delete old brand image:", deleteError);
+      } catch (error) {
+        console.log("Failed to delete old brand image:", error);
       }
     }
 
