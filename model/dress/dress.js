@@ -1,72 +1,64 @@
 const mongoose = require("mongoose");
-
+const imageSchema = new mongoose.Schema(
+  {
+    url: { type: String, required: true },
+    publicId: { type: String, required: true },
+  },
+  { _id: false },
+);
+const sizeSchema = new mongoose.Schema(
+  {
+    size: {
+      type: String,
+      required: true,
+      enum: [
+        "XS",
+        "S",
+        "M",
+        "L",
+        "XL",
+        "XXL",
+        "28",
+        "30",
+        "32",
+        "34",
+        "36",
+        "38",
+        "40",
+        "42",
+        "44",
+      ],
+    },
+    stock: { type: Number, required: true, default: 0, min: 0 },
+  },
+  { _id: false },
+);
+const variantSchema = new mongoose.Schema({
+  color: {
+    name: { type: String, required: true, trim: true },
+    code: { type: String, required: true, default: "#000000", trim: true },
+    mainImage: { type: imageSchema, required: true },
+    subImages: { type: [imageSchema], default: [] },
+  },
+  sizes: { type: [sizeSchema], default: [] },
+});
 const dressSchema = new mongoose.Schema(
   {
-    // =========================
-    // BASIC INFORMATION
-    // =========================
-
-    name: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-
-    description: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-
+    name: { type: String, required: true, trim: true },
+    description: { type: String, required: true, trim: true },
     category: {
       type: String,
       required: true,
       enum: ["Shirts", "Pants", "Jackets", "Innerwear", "Shorts", "T-Shirts"],
     },
-
     brand: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "brand",
       required: true,
     },
-
-    // =========================
-    // PRICING
-    // =========================
-
-    price: {
-      type: Number,
-      required: true,
-      min: 0,
-    },
-
-    realPrice: {
-      type: Number,
-      required: true,
-      min: 0,
-    },
-
-    discount: {
-      type: Number,
-      default: 0,
-      min: 0,
-      max: 100,
-    },
-
-    // =========================
-    // STOCK
-    // =========================
-
-    stock: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-
-    // =========================
-    // PRODUCT IDENTIFICATION
-    // =========================
-
+    price: { type: Number, required: true, min: 0 },
+    realPrice: { type: Number, required: true, min: 0 },
+    discount: { type: Number, default: 0, min: 0, max: 100 },
     sku: {
       type: String,
       required: true,
@@ -74,101 +66,15 @@ const dressSchema = new mongoose.Schema(
       trim: true,
       uppercase: true,
     },
-
-    // =========================
-    // STATUS
-    // =========================
-
     status: {
       type: String,
       enum: ["Active", "Inactive", "Draft"],
       default: "Draft",
     },
-
-    // =========================
-    // PRODUCT DETAILS
-    // =========================
-
-    details: {
-      type: Map,
-      of: { type: String, trim: true },
-      default: {},
-    },
-
-    // =========================
-    // PRODUCT VARIANTS
-    // =========================
-
-    variants: [
-      {
-        color: {
-          name: {
-            type: String,
-            required: true,
-            trim: true,
-          },
-
-          code: {
-            type: String,
-            required: true,
-            trim: true,
-            default: "#000000",
-          },
-        },
-
-        images: [
-          {
-            url: {
-              type: String,
-              required: true,
-            },
-
-            publicId: {
-              type: String,
-              required: true,
-            },
-          },
-        ],
-
-        sizes: [
-          {
-            size: {
-              type: String,
-              required: true,
-              enum: [
-                "XS",
-                "S",
-                "M",
-                "L",
-                "XL",
-                "XXL",
-                "28",
-                "30",
-                "32",
-                "34",
-                "36",
-                "38",
-                "40",
-                "42",
-                "44",
-              ],
-            },
-
-            stock: {
-              type: Number,
-              default: 0,
-              min: 0,
-            },
-          },
-        ],
-      },
-    ],
+    details: { type: Map, of: { type: String, trim: true }, default: {} },
+    variants: { type: [variantSchema], default: [] },
   },
-  {
-    timestamps: true,
-  },
+  { timestamps: true },
 );
-
 const dressModel = mongoose.model("dress", dressSchema);
-
 module.exports = dressModel;

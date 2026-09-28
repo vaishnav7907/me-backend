@@ -162,41 +162,20 @@ const deleteLatestArrivals = async (req, res) => {
 const updateLatestArrivals = async (req, res) => {
   try {
     const { description, category, name } = req.body;
-
-    if (!name) {
-      return res
-        .status(400)
-        .json({ success: false, message: "name  Required" });
-    }
-
-    if (!description) {
-      return res
-        .status(400)
-        .json({ success: false, message: "description Required" });
-    }
-
-    if (!category) {
-      return res
-        .status(404)
-        .json({ success: false, message: " select category " });
-    }
-
     const { id } = req.params;
+
     const existingLatestArrivals = await latestArrivalsModel.findById(id);
 
     if (!existingLatestArrivals) {
-      return res
-        .status(404)
-        .json({ success: false, message: "didn't exist latest arrivals" });
+      return res.status(404).json({
+        success: false,
+        message: "Latest arrival not found",
+      });
     }
 
-    const updateLataestArrivalsData = {
-      name,
-      category,
-      description,
-    };
-
+    const updateLatestArrivalsData = {};
     let oldPublicId = null;
+    let newPublicId = null;
 
     if (req.file) {
       const imageBuffer = req.file.buffer;
@@ -223,20 +202,59 @@ const updateLatestArrivals = async (req, res) => {
         streamiFier.createReadStream(optimizeImage).pipe(uploadLatestArrivals);
       });
 
-      oldPublicId = existingLatestArrivals.arrivalsCategoryImage?.publicId;
-      updateLataestArrivalsData.arrivalsCategoryImage = {
+      oldPublicId =
+        existingLatestArrivals.arrivalsCategoryImage?.publicId || null;
+
+      newPublicId = result.public_id;
+
+      updateLatestArrivalsData.arrivalsCategoryImage = {
         url: result.secure_url,
         publicId: result.public_id,
       };
     }
 
+    if (name !== undefined && name.trim() !== "") {
+      updateLatestArrivalsData.name = name;
+    }
+
+    if (description !== undefined && description.trim() !== "") {
+      updateLatestArrivalsData.description = description;
+    }
+
+    if (category !== undefined && category.trim() !== "") {
+      updateLatestArrivalsData.category = category;
+    }
+
+    if (Object.keys(updateLatestArrivalsData).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No data provided for update",
+      });
+    }
+
     const updateLatestArrivals = await latestArrivalsModel.findByIdAndUpdate(
       id,
-      updateLataestArrivalsData,
-      { returnDocument: "after", runValidators: true },
+      updateLatestArrivalsData,
+      {
+        returnDocument: "after",
+        runValidators: true,
+      },
     );
 
-    if (oldPublicId) {
+    if (!updateLatestArrivals) {
+      if (newPublicId) {
+        await cloudinary.uploader.destroy(newPublicId, {
+          resource_type: "image",
+        });
+      }
+
+      return res.status(404).json({
+        success: false,
+        message: "Latest arrival not found",
+      });
+    }
+
+    if (oldPublicId && newPublicId) {
       try {
         await cloudinary.uploader.destroy(oldPublicId, {
           resource_type: "image",
@@ -248,7 +266,7 @@ const updateLatestArrivals = async (req, res) => {
       }
     }
 
-    return res.status(201).json({
+    return res.status(200).json({
       success: true,
       message: "Latest arrival updated successfully",
       latestArrivals: updateLatestArrivals,

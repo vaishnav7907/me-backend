@@ -5,31 +5,230 @@ const sharp = require("sharp");
 const streamFier = require("streamifier");
 const mongoose = require("mongoose");
 ///create dress //////////////////////
+// const createDress = async (req, res) => {
+//   try {
+//     console.log("REQ BODY:", req.body);
+//     console.log("REQ FILES:", req.files);
+
+//     const {
+//       name,
+//       description,
+//       category,
+//       price,
+//       realPrice,
+//       brand,
+//       details,
+//       variants,
+//       sku,
+//       status,
+//       discount,
+//     } = req.body;
+
+//     if (!req.files || req.files.length === 0) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "At least one image is required",
+//       });
+//     }
+
+//     if (!brand) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Brand is required",
+//       });
+//     }
+
+//     if (!variants) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Variants are required",
+//       });
+//     }
+
+//     const existBrand = await brandModel.findById(brand);
+
+//     if (!existBrand) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Brand not found",
+//       });
+//     }
+
+//     // =========================
+//     // PARSE VARIANTS
+//     // =========================
+
+//     let parsedVariants;
+
+//     try {
+//       parsedVariants =
+//         typeof variants === "string" ? JSON.parse(variants) : variants;
+
+//       if (!Array.isArray(parsedVariants)) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Variants must be an array",
+//         });
+//       }
+//     } catch (error) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid variants format",
+//       });
+//     }
+
+//     // =========================
+//     // PARSE DETAILS
+//     // =========================
+
+//     let parsedDetails = {};
+
+//     if (details) {
+//       try {
+//         parsedDetails =
+//           typeof details === "string" ? JSON.parse(details) : details;
+
+//         if (typeof parsedDetails !== "object" || Array.isArray(parsedDetails)) {
+//           return res.status(400).json({
+//             success: false,
+//             message: "Details must be an object",
+//           });
+//         }
+//       } catch (error) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Invalid details format",
+//         });
+//       }
+//     }
+
+//     // =========================
+//     // UPLOAD IMAGES
+//     // =========================
+
+//     const uploadedImage = [];
+
+//     for (const file of req.files) {
+//       const imageBuffer = file.buffer;
+
+//       const optimizedImg = await sharp(imageBuffer)
+//         .webp({ quality: 80 })
+//         .toBuffer();
+
+//       const result = await new Promise((resolve, reject) => {
+//         const uploadStream = cloudinary.uploader.upload_stream(
+//           {
+//             folder: "Me/Dresses",
+//             resource_type: "image",
+//           },
+//           (error, result) => {
+//             if (error) {
+//               console.log("Cloudinary error:", error);
+//               reject(error);
+//             } else {
+//               resolve(result);
+//             }
+//           },
+//         );
+
+//         streamFier.createReadStream(optimizedImg).pipe(uploadStream);
+//       });
+
+//       uploadedImage.push({
+//         url: result.secure_url,
+//         publicId: result.public_id,
+//       });
+//     }
+
+//     // =========================
+//     // CREATE VARIANTS
+//     // =========================
+
+//     const finalVariants = parsedVariants.map((variant) => ({
+//       color: {
+//         name: variant.color.name,
+//         code: variant.color.code || "#000000",
+//       },
+
+//       images: uploadedImage,
+
+//       sizes: variant.sizes.map((size) => ({
+//         size: size.size,
+//         stock: Number(size.stock) || 0,
+//       })),
+//     }));
+
+//     // =========================
+//     // TOTAL STOCK
+//     // =========================
+
+//     const totalStock = finalVariants.reduce(
+//       (total, variant) =>
+//         total +
+//         variant.sizes.reduce((sizeTotal, size) => sizeTotal + size.stock, 0),
+//       0,
+//     );
+
+//     // =========================
+//     // CREATE PRODUCT
+//     // =========================
+
+//     const createDressData = await dressModel.create({
+//       name,
+//       description,
+//       category,
+//       price: Number(price),
+//       realPrice: Number(realPrice),
+//       discount: Number(discount) || 0,
+//       stock: totalStock,
+//       sku: sku?.trim().toUpperCase(),
+//       status,
+//       brand: existBrand._id,
+
+//       details: parsedDetails,
+
+//       variants: finalVariants,
+//     });
+
+//     // =========================
+//     // POPULATE BRAND
+//     // =========================
+
+//     const populatedProduct = await dressModel
+//       .findById(createDressData._id)
+//       .populate("brand");
+
+//     return res.status(201).json({
+//       success: true,
+//       message: "Product created successfully",
+//       product: populatedProduct,
+//     });
+//   } catch (error) {
+//     console.log("Error in create dress:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to create product",
+//       error: error.message,
+//     });
+//   }
+// };
+
 const createDress = async (req, res) => {
   try {
-    console.log("REQ BODY:", req.body);
-    console.log("REQ FILES:", req.files);
-
     const {
       name,
       description,
       category,
+      brand,
       price,
       realPrice,
-      brand,
-      details,
-      variants,
+      discount,
       sku,
       status,
-      discount,
+      details,
+      variants,
     } = req.body;
-
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "At least one image is required",
-      });
-    }
 
     if (!brand) {
       return res.status(400).json({
@@ -38,48 +237,42 @@ const createDress = async (req, res) => {
       });
     }
 
-    if (!variants) {
+    const brandExist = await brandModel.findById(brand);
+
+    if (!brandExist) {
       return res.status(400).json({
         success: false,
-        message: "Variants are required",
+        message: "brand is not found",
       });
     }
 
-    const existBrand = await brandModel.findById(brand);
-
-    if (!existBrand) {
-      return res.status(404).json({
-        success: false,
-        message: "Brand not found",
-      });
+    if (price === undefined || price === "") {
+      return res
+        .status(400)
+        .json({ success: false, message: "Price is required" });
     }
-
-    // =========================
-    // PARSE VARIANTS
-    // =========================
-
-    let parsedVariants;
-
-    try {
-      parsedVariants =
-        typeof variants === "string" ? JSON.parse(variants) : variants;
-
-      if (!Array.isArray(parsedVariants)) {
-        return res.status(400).json({
-          success: false,
-          message: "Variants must be an array",
-        });
-      }
-    } catch (error) {
+    if (realPrice === undefined || realPrice === "") {
+      return res
+        .status(400)
+        .json({ success: false, message: "Real price is required" });
+    }
+    if (Number(price) > Number(realPrice)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid variants format",
+        message: "Price cannot be greater than real price",
       });
     }
-
-    // =========================
-    // PARSE DETAILS
-    // =========================
+    if (!sku) {
+      return res
+        .status(400)
+        .json({ success: false, message: "SKU is required" });
+    }
+    const skuExist = await dressModel.findOne({ sku: sku.toUpperCase() });
+    if (skuExist) {
+      return res
+        .status(400)
+        .json({ success: false, message: "SKU already exists" });
+    }
 
     let parsedDetails = {};
 
@@ -87,43 +280,53 @@ const createDress = async (req, res) => {
       try {
         parsedDetails =
           typeof details === "string" ? JSON.parse(details) : details;
-
-        if (typeof parsedDetails !== "object" || Array.isArray(parsedDetails)) {
-          return res.status(400).json({
-            success: false,
-            message: "Details must be an object",
-          });
-        }
       } catch (error) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid details format",
-        });
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid details format" });
       }
     }
 
-    // =========================
-    // UPLOAD IMAGES
-    // =========================
+    let parsedVariants = [];
 
-    const uploadedImage = [];
+    if (variants) {
+      try {
+        parsedVariants =
+          typeof variants === "string" ? JSON.parse(variants) : variants;
+      } catch (error) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid variants format" });
+      }
+    }
+
+    if (!Array.isArray(parsedVariants)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Variants must be an array" });
+    }
+
+    if (!req.files || req.files.length === 0) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Product images are required" });
+    }
+
+    const uploadedImages = [];
 
     for (const file of req.files) {
-      const imageBuffer = file.buffer;
-
-      const optimizedImg = await sharp(imageBuffer)
+      const imageBuffer = await sharp(file.buffer)
         .webp({ quality: 80 })
         .toBuffer();
 
-      const result = await new Promise((resolve, reject) => {
-        const uploadStream = cloudinary.uploader.upload_stream(
+      const uploadResult = await new Promise((resolve, reject) => {
+        const imageUpload = cloudinary.uploader.upload_stream(
           {
             folder: "Me/Dresses",
             resource_type: "image",
           },
           (error, result) => {
             if (error) {
-              console.log("Cloudinary error:", error);
               reject(error);
             } else {
               resolve(result);
@@ -131,81 +334,52 @@ const createDress = async (req, res) => {
           },
         );
 
-        streamFier.createReadStream(optimizedImg).pipe(uploadStream);
+        streamFier.createReadStream(imageBuffer).pipe(imageUpload);
       });
 
-      uploadedImage.push({
-        url: result.secure_url,
-        publicId: result.public_id,
+      uploadedImages.push({
+        url: uploadResult.secure_url,
+        publicId: uploadResult.public_id,
       });
     }
 
-    // =========================
-    // CREATE VARIANTS
-    // =========================
+    let imageIndex = 0;
 
-    const finalVariants = parsedVariants.map((variant) => ({
-      color: {
-        name: variant.color.name,
-        code: variant.color.code || "#000000",
-      },
+    const finalVariants = parsedVariants.map((variant, index) => {
+      const mainImage = uploadedImages[imageIndex];
 
-      images: uploadedImage,
+      if (!mainImage) {
+        throw new Error(`main image is missing for variant ${index + 1}`);
+      }
 
-      sizes: variant.sizes.map((size) => ({
-        size: size.size,
-        stock: Number(size.stock) || 0,
-      })),
-    }));
+      imageIndex++
+    });
 
-    // =========================
-    // TOTAL STOCK
-    // =========================
-
-    const totalStock = finalVariants.reduce(
-      (total, variant) =>
-        total +
-        variant.sizes.reduce((sizeTotal, size) => sizeTotal + size.stock, 0),
-      0,
-    );
-
-    // =========================
-    // CREATE PRODUCT
-    // =========================
-
-    const createDressData = await dressModel.create({
+    const createProduct = await dressModel.create({
       name,
       description,
       category,
-      price: Number(price),
-      realPrice: Number(realPrice),
-      discount: Number(discount) || 0,
-      stock: totalStock,
-      sku: sku?.trim().toUpperCase(),
+      brand,
+      price,
+      realPrice,
+      discount,
+      sku,
       status,
-      brand: existBrand._id,
-
       details: parsedDetails,
-
       variants: finalVariants,
     });
 
-    // =========================
-    // POPULATE BRAND
-    // =========================
-
-    const populatedProduct = await dressModel
-      .findById(createDressData._id)
+    const product = await dressModel
+      .findById(createProduct._id)
       .populate("brand");
 
     return res.status(201).json({
       success: true,
       message: "Product created successfully",
-      product: populatedProduct,
+      product,
     });
   } catch (error) {
-    console.log("Error in create dress:", error);
-
+    console.error("Create Product Error:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to create product",
@@ -478,18 +652,32 @@ const updateProducts = async (req, res) => {
 const deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
+
     const productExists = await dressModel.findById(id);
 
     if (!productExists) {
-      return res
-        .status(404)
-        .json({ success: false, message: "product doesn't Exist" });
+      return res.status(404).json({
+        success: false,
+        message: "Product doesn't exist",
+      });
     }
 
     for (const variant of productExists.variants) {
       for (const image of variant.images) {
         if (image.publicId) {
-          await cloudinary.uploader.destroy(image.publicId);
+          try {
+            await cloudinary.uploader.destroy(image.publicId, {
+              resource_type: "image",
+            });
+
+            console.log("Product image deleted:", image.publicId);
+          } catch (error) {
+            console.log(
+              "Failed to delete product image:",
+              image.publicId,
+              error,
+            );
+          }
         }
       }
     }
@@ -501,7 +689,8 @@ const deleteProduct = async (req, res) => {
       message: "Product and Cloudinary images deleted successfully",
     });
   } catch (error) {
-    console.log("error in delete product", error);
+    console.log("Error in delete product:", error);
+
     return res.status(500).json({
       success: false,
       message: "Failed to delete product",
