@@ -352,8 +352,43 @@ const createDress = async (req, res) => {
         throw new Error(`main image is missing for variant ${index + 1}`);
       }
 
-      imageIndex++
+      imageIndex++;
+
+      const subImages = [];
+
+      const subImageCount = Array.isArray(variant.color?.subImages)
+        ? variant.color.subImages.length
+        : 0;
+
+      for (let i = 0; i < subImageCount; i++) {
+        const subImage = uploadedImages[imageIndex];
+
+        if (!subImage) {
+          throw new Error(`Sub image is missing for variant ${index + 1}`);
+        }
+
+        subImages.push({
+          url: subImage.url,
+          publicId: subImage.publicId,
+        });
+
+        imageIndex++;
+      }
+
+      return {
+        color: {
+          name: variant.color.name,
+          code: variant.color.code || "#000000",
+          mainImage: { url: mainImage.url, publicId: mainImage.publicId },
+          subImages,
+        },
+        sizes: variant.sizes || [],
+      };
     });
+
+    if (imageIndex !== uploadedImages.length) {
+      throw new Error("Some uploaded images are not assigned to variants");
+    }
 
     const createProduct = await dressModel.create({
       name,
@@ -446,7 +481,7 @@ const updateProducts = async (req, res) => {
 
     let existBrand = null;
 
-    if (brand) {
+    if (brand !== undefined && brand !== "") {
       if (!mongoose.Types.ObjectId.isValid(brand)) {
         return res.status(400).json({
           success: false,
@@ -471,7 +506,11 @@ const updateProducts = async (req, res) => {
         parsedDetails =
           typeof details === "string" ? JSON.parse(details) : details;
 
-        if (typeof parsedDetails !== "object" || Array.isArray(parsedDetails)) {
+        if (
+          typeof parsedDetails !== "object" ||
+          parsedDetails === null ||
+          Array.isArray(parsedDetails)
+        ) {
           return res.status(400).json({
             success: false,
             message: "Details must be an object",
@@ -504,14 +543,83 @@ const updateProducts = async (req, res) => {
           message: "Variants must be an array",
         });
       }
+
+      if (updatedVariants.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "At least one variant is required",
+        });
+      }
+
+      for (let i = 0; i < updatedVariants.length; i++) {
+        const variant = updatedVariants[i];
+
+        if (!variant.color) {
+          return res.status(400).json({
+            success: false,
+            message: `Color is required for variant ${i + 1}`,
+          });
+        }
+
+        if (!variant.color.name || !variant.color.name.trim()) {
+          return res.status(400).json({
+            success: false,
+            message: `Color name is required for variant ${i + 1}`,
+          });
+        }
+
+        if (
+          !variant.color.code ||
+          !/^#[0-9A-Fa-f]{6}$/.test(variant.color.code)
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: `Invalid color code for variant ${i + 1}`,
+          });
+        }
+
+        if (!Array.isArray(variant.sizes)) {
+          return res.status(400).json({
+            success: false,
+            message: `Sizes must be an array for variant ${i + 1}`,
+          });
+        }
+
+        variant.sizes = variant.sizes.map((sizeItem) => ({
+          size: sizeItem.size,
+          stock: Math.max(0, Number(sizeItem.stock) || 0),
+        }));
+      }
     }
 
-    const oldImages = existProduct.variants?.[0]?.images || [];
+    const oldVariants = existProduct.variants || [];
+
+    const oldImages = [];
+
+    for (const variant of oldVariants) {
+      if (variant.color?.mainImage?.publicId) {
+        oldImages.push({
+          url: variant.color.mainImage.url,
+          publicId: variant.color.mainImage.publicId,
+        });
+      }
+
+      if (variant.color?.subImages?.length > 0) {
+        for (const image of variant.color.subImages) {
+          if (image.publicId) {
+            oldImages.push({
+              url: image.url,
+              publicId: image.publicId,
+            });
+          }
+        }
+      }
+    }
 
     if (updatedVariants) {
-      if (req.files && req.files.length > 0) {
-        const newImages = [];
+      const uploadedImages = [];
 
+      if (req.files && req.files.length > 0) {
         for (const file of req.files) {
           const buffer = await sharp(file.buffer)
             .webp({ quality: 80 })
@@ -536,30 +644,114 @@ const updateProducts = async (req, res) => {
             streamFier.createReadStream(buffer).pipe(uploadStream);
           });
 
-          newImages.push({
+          uploadedImages.push({
             url: result.secure_url,
             publicId: result.public_id,
           });
         }
+      }
 
-        if (updatedVariants.length > 0) {
-          updatedVariants[0].images = newImages;
+      let uploadIndex = 0;
+
+      for (
+        let variantIndex = 0;
+        variantIndex < updatedVariants.length;
+        variantIndex++
+      ) {
+        const newVariant = updatedVariants[variantIndex];
+
+        const oldVariant = oldVariants[variantIndex];
+
+        const oldMainImage = oldVariant?.color?.mainImage || null;
+
+        const oldSubImages = oldVariant?.color?.subImages || [];
+
+        const newMainImage = newVariant.color?.mainImage;
+
+        if (newMainImage?.replace === true) {
+          if (!uploadedImages[uploadIndex]) {
+            return res.status(400).json({
+              success: false,
+              message: `New main image is missing for variant ${
+                variantIndex + 1
+              }`,
+            });
+          }
+
+          newVariant.color.mainImage = uploadedImages[uploadIndex];
+
+          uploadIndex++;
+        } else if (newMainImage?.publicId) {
+          newVariant.color.mainImage = {
+            url: newMainImage.url,
+            publicId: newMainImage.publicId,
+          };
+        } else if (oldMainImage) {
+          newVariant.color.mainImage = oldMainImage;
+        } else {
+          return res.status(400).json({
+            success: false,
+            message: `Main image is required for variant ${variantIndex + 1}`,
+          });
         }
-      } else {
-        if (updatedVariants.length > 0) {
-          updatedVariants[0].images = oldImages;
+
+        const newSubImages = Array.isArray(newVariant.color?.subImages)
+          ? newVariant.color.subImages
+          : [];
+
+        const finalSubImages = [];
+
+        for (let subIndex = 0; subIndex < newSubImages.length; subIndex++) {
+          const subImage = newSubImages[subIndex];
+
+          if (subImage?.replace === true) {
+            if (!uploadedImages[uploadIndex]) {
+              return res.status(400).json({
+                success: false,
+                message: `New sub image is missing for variant ${
+                  variantIndex + 1
+                }, image ${subIndex + 1}`,
+              });
+            }
+
+            finalSubImages.push(uploadedImages[uploadIndex]);
+
+            uploadIndex++;
+          } else if (subImage?.publicId) {
+            finalSubImages.push({
+              url: subImage.url,
+              publicId: subImage.publicId,
+            });
+          } else if (oldSubImages[subIndex]) {
+            finalSubImages.push(oldSubImages[subIndex]);
+          }
         }
+
+        newVariant.color.subImages = finalSubImages;
+
+        delete newVariant.color.mainImage.replace;
+
+        for (const subImage of newVariant.color.subImages) {
+          delete subImage.replace;
+        }
+      }
+
+      if (uploadIndex !== uploadedImages.length) {
+        return res.status(400).json({
+          success: false,
+          message: "Uploaded images were not assigned correctly",
+        });
       }
     }
 
     const updateData = {};
 
-    if (name !== undefined && name !== "") {
-      updateData.name = name;
+    if (name !== undefined && name.trim() !== "") {
+      updateData.name = name.trim();
     }
 
-    if (description !== undefined && description !== "") {
-      updateData.description = description;
+    if (description !== undefined && description.trim() !== "") {
+      updateData.description = description.trim();
     }
 
     if (category !== undefined && category !== "") {
@@ -567,15 +759,15 @@ const updateProducts = async (req, res) => {
     }
 
     if (price !== undefined && price !== "") {
-      updateData.price = price;
+      updateData.price = Number(price);
     }
 
     if (realPrice !== undefined && realPrice !== "") {
-      updateData.realPrice = realPrice;
+      updateData.realPrice = Number(realPrice);
     }
 
     if (discount !== undefined && discount !== "") {
-      updateData.discount = discount;
+      updateData.discount = Number(discount);
     }
 
     if (existBrand) {
@@ -590,16 +782,31 @@ const updateProducts = async (req, res) => {
       updateData.variants = updatedVariants;
     }
 
-    if (sku !== undefined && sku !== "") {
-      updateData.sku = sku;
+    if (sku !== undefined && sku.trim() !== "") {
+      updateData.sku = sku.trim().toUpperCase();
     }
 
     if (status !== undefined && status !== "") {
       updateData.status = status;
     }
 
+    const finalPrice =
+      updateData.price !== undefined ? updateData.price : existProduct.price;
+
+    const finalRealPrice =
+      updateData.realPrice !== undefined
+        ? updateData.realPrice
+        : existProduct.realPrice;
+
+    if (finalRealPrice < finalPrice) {
+      return res.status(400).json({
+        success: false,
+        message: "Real price should be greater than or equal to selling price",
+      });
+    }
+
     const updatedProduct = await dressModel.findByIdAndUpdate(id, updateData, {
-      returnDocument: "after",
+      new: true,
       runValidators: true,
     });
 
@@ -610,9 +817,25 @@ const updateProducts = async (req, res) => {
       });
     }
 
-    if (req.files && req.files.length > 0) {
+    if (updatedVariants) {
+      const newImageIds = [];
+
+      for (const variant of updatedProduct.variants) {
+        if (variant.color?.mainImage?.publicId) {
+          newImageIds.push(variant.color.mainImage.publicId);
+        }
+
+        if (variant.color?.subImages?.length > 0) {
+          for (const image of variant.color.subImages) {
+            if (image.publicId) {
+              newImageIds.push(image.publicId);
+            }
+          }
+        }
+      }
+
       for (const oldImage of oldImages) {
-        if (oldImage.publicId) {
+        if (oldImage.publicId && !newImageIds.includes(oldImage.publicId)) {
           try {
             await cloudinary.uploader.destroy(oldImage.publicId, {
               resource_type: "image",
@@ -662,18 +885,36 @@ const deleteProduct = async (req, res) => {
       });
     }
 
-    for (const variant of productExists.variants) {
-      for (const image of variant.images) {
-        if (image.publicId) {
+    for (const variant of productExists.variants || []) {
+      const mainImage = variant.color?.mainImage;
+
+      if (mainImage?.publicId) {
+        try {
+          await cloudinary.uploader.destroy(mainImage.publicId, {
+            resource_type: "image",
+          });
+
+          console.log("Main product image deleted:", mainImage.publicId);
+        } catch (error) {
+          console.log(
+            "Failed to delete main product image:",
+            mainImage.publicId,
+            error,
+          );
+        }
+      }
+
+      for (const image of variant.color?.subImages || []) {
+        if (image?.publicId) {
           try {
             await cloudinary.uploader.destroy(image.publicId, {
               resource_type: "image",
             });
 
-            console.log("Product image deleted:", image.publicId);
+            console.log("Product sub image deleted:", image.publicId);
           } catch (error) {
             console.log(
-              "Failed to delete product image:",
+              "Failed to delete product sub image:",
               image.publicId,
               error,
             );
