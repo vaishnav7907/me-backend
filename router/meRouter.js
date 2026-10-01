@@ -7,11 +7,11 @@ const {
   updateProducts,
   deleteProduct,
 } = require("../controller/dressController/dressController");
-const {
-  userSignUp,
-  adminSignUp,
-  userAdminLogin,
-} = require("../controller/authController/authenticationController");
+// const {
+//   userSignUp,
+//   adminSignUp,
+//   userAdminLogin,
+// } = require("../controller/authController/userAdminAuthentication/authenticationController");
 const {
   getNewArrivals,
   createLatestArrivals,
@@ -28,6 +28,9 @@ const {
 const {
   getShirtsByCategory,
 } = require("../controller/getProductsByCategory/GetProductsByCategory");
+const settingMiddleware = require("../middleware/middleware");
+const { createCheckout } = require("../controller/checkoutController/checkoutController");
+const { userSignUp, adminSignUp, userAdminLogin } = require("../controller/authController/userAdminAuthentication/authenticationController");
 
 const router = express.Router();
 
@@ -127,4 +130,10 @@ router.patch(
 // get products by category
 
 router.get("/getProductsByCategory/:category", getShirtsByCategory);
+
+
+
+// checkout section
+
+router.post("/Checkout",settingMiddleware,createCheckout)
 module.exports = router;

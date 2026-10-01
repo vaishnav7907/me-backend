@@ -1,39 +1,59 @@
-const authModel = require("../../model/authentication/authentication");
+const authModel = require("../../../model/authentication/authentication");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const userSignUp = async (req, res) => {
   try {
-    const { FullName, Email, Password } = req.body;
-    const existingemail = await authModel.findOne({ Email });
-    if (existingemail) {
-      return res.status(409).json({ message: "email already exist" });
+    const { FullName, Email, Password, Phone } = req.body;
+
+    if (!FullName || !Email || !Password || !Phone) {
+      return res.status(400).json({
+        success: false,
+        message: "All fields are required",
+      });
     }
 
-    const existingusername = await authModel.findOne({ FullName });
+    const existingEmail = await authModel.findOne({ Email });
 
-    if (existingusername) {
-      return res.status(409).json({ message: "username already exist" });
+    if (existingEmail) {
+      return res.status(409).json({
+        success: false,
+        message: "Email already exists",
+      });
+    }
+
+    const existingUsername = await authModel.findOne({ FullName });
+
+    if (existingUsername) {
+      return res.status(409).json({
+        success: false,
+        message: "Username already exists",
+      });
     }
 
     const hashed = await bcrypt.hash(Password, 10);
+
     const createUser = await authModel.create({
       FullName,
       Email,
+      Phone,
       Password: hashed,
       role: "user",
     });
 
-    res.status(201).json({
+    return res.status(201).json({
+      success: true,
       message: "User registered successfully",
       user: {
         id: createUser._id,
         name: createUser.FullName,
         email: createUser.Email,
+        phone: createUser.Phone,
         role: createUser.role,
       },
     });
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
+      success: false,
       message: "Signup failed",
       error: error.message,
     });
@@ -95,7 +115,7 @@ const userAdminLogin = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-      // Only admin can access admin login
+    // Only admin can access admin login
     if (exist.role !== "admin") {
       return res.status(403).json({
         message: "Admin access required",
