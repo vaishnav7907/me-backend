@@ -103,28 +103,32 @@ const adminSignUp = async (req, res) => {
 const userAdminLogin = async (req, res) => {
   try {
     const { FullName, Password } = req.body;
+
     if (!FullName || !Password) {
-      return res
-        .status(400)
-        .json({ message: "fullname and password are required" });
-    }
-
-    const exist = await authModel.findOne({ FullName });
-
-    if (!exist) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    // Only admin can access admin login
-    if (exist.role !== "admin") {
-      return res.status(403).json({
-        message: "Admin access required",
+      return res.status(400).json({
+        message: "Fullname and password are required",
       });
     }
-    const isPasswordMatch = await bcrypt.compare(Password, exist.Password);
+
+    const exist = await authModel.findOne({
+      FullName: FullName.trim(),
+    });
+
+    if (!exist) {
+      return res.status(401).json({
+        message: "Invalid username or password",
+      });
+    }
+
+    const isPasswordMatch = await bcrypt.compare(
+      Password,
+      exist.Password
+    );
 
     if (!isPasswordMatch) {
-      return res.status(401).json({ message: "Invalid email or password" });
+      return res.status(401).json({
+        message: "Invalid username or password",
+      });
     }
 
     const token = jwt.sign(
@@ -133,9 +137,12 @@ const userAdminLogin = async (req, res) => {
         role: exist.role,
       },
       process.env.JWT_SECRETE,
-      { expiresIn: "1d" },
+      {
+        expiresIn: "1d",
+      }
     );
-    res.status(200).json({
+
+    return res.status(200).json({
       message: "Login successful",
       token,
       user: {
@@ -146,7 +153,10 @@ const userAdminLogin = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ message: "Login failed", error: error.message });
+    return res.status(500).json({
+      message: "Login failed",
+      error: error.message,
+    });
   }
 };
 
