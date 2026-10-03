@@ -1,5 +1,6 @@
 const checkoutModel = require("../../model/checkout/checkoutModel");
 const dressModel = require("../../model/dress/dress");
+const authModel = require("../../model/authentication/authentication");
 const mongoose = require("mongoose");
 const createCheckout = async (req, res) => {
   try {
@@ -51,6 +52,19 @@ const createCheckout = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Invalid payment method",
+      });
+    }
+
+    const existingUser = await authModel.findById(userId);
+    if (!existingUser) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+    if (existingUser.Email !== email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email doesn't match the logged-in user",
       });
     }
 
@@ -164,6 +178,9 @@ const createCheckout = async (req, res) => {
 
       totalAmount,
     });
+
+    selectedSize.stock = selectedSize.stock - selectedQuantity;
+    await existingProduct.save();
 
     return res.status(201).json({
       success: true,
