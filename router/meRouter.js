@@ -37,6 +37,10 @@ const {
   adminSignUp,
   userAdminLogin,
 } = require("../controller/authController/userAdminAuthentication/authenticationController");
+const {
+  createRazorpayOrder,
+} = require("../controller/payment/razorpayController/razorpayController");
+const { verifyRazorpayPayment } = require("../controller/payment/verifyRezorPay/verifyRezorPay");
 
 const router = express.Router();
 
@@ -141,6 +145,10 @@ router.get("/getProductsByCategory/:category", getShirtsByCategory);
 
 router.post("/Checkout", settingMiddleware, createCheckout);
 
+// razorpay payment
+
+router.post("/createRazorpayOrder", createRazorpayOrder);
+
+router.post("/verifyRazorpayPayment",verifyRazorpayPayment)
+
 module.exports = router;
-
-
