@@ -18,6 +18,7 @@ const checkoutSchema = new mongoose.Schema(
       name: { type: String, required: true, trim: true },
       image: { type: String, required: true },
       price: { type: Number, required: true, min: 0 },
+      costPrice: { type: Number, required: true, min: 0, },
       quantity: { type: Number, required: true, min: 1 },
       color: {
         name: { type: String, required: true },

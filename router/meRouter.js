@@ -41,6 +41,7 @@ const {
   createRazorpayOrder,
 } = require("../controller/payment/razorpayController/razorpayController");
 const { verifyRazorpayPayment } = require("../controller/payment/verifyRezorPay/verifyRezorPay");
+const { getAdminOrders, updateOrderStatus, bulkUpdateOrderStatus } = require("../controller/orderConfirmation/orderConfirmationController");
 
 const router = express.Router();
 
@@ -150,5 +151,12 @@ router.post("/Checkout", settingMiddleware, createCheckout);
 router.post("/createRazorpayOrder", createRazorpayOrder);
 
 router.post("/verifyRazorpayPayment",verifyRazorpayPayment)
+
+
+// order status
+
+router.get("/getAdminOrder",getAdminOrders)
+router.patch("/updateOrderStatus",settingMiddleware,updateOrderStatus)
+router.patch("/bulkUpdateOrderStatus",settingMiddleware,bulkUpdateOrderStatus)
 
 module.exports = router;
