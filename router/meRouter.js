@@ -156,7 +156,7 @@ router.post("/verifyRazorpayPayment",verifyRazorpayPayment)
 // order status
 
 router.get("/getAdminOrder",getAdminOrders)
-router.patch("/updateOrderStatus",settingMiddleware,updateOrderStatus)
+router.patch("/updateOrderStatus/:id",settingMiddleware,updateOrderStatus)
 router.patch("/bulkUpdateOrderStatus",settingMiddleware,bulkUpdateOrderStatus)
 
 module.exports = router;

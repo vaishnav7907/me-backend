@@ -2,7 +2,7 @@ const checkoutModel = require("../../model/checkout/checkoutModel");
 
 const getAdminOrders = async (req, res) => {
   try {
-    const orders = await checkout
+    const orders = await checkoutModel
       .find()
       .populate("user", "FullName Email")
       .populate("product.productId", "name")
@@ -37,7 +37,7 @@ const updateOrderStatus = async (req, res) => {
       Cancelled: [],
     };
 
-    if (!allowedTransitions[orderStatus] && orderStatus !== "Delivered") {
+    if (!allowedTransitions.hasOwnProperty(orderStatus)) {
       return res.status(400).json({
         success: false,
         message: "Invalid order status",
@@ -66,7 +66,7 @@ const updateOrderStatus = async (req, res) => {
       order.paymentMethod === "Cash on Delivery" &&
       orderStatus === "Delivered"
     ) {
-      order.paymentMethod = "paid";
+      order.paymentStatus = "Paid";
     }
 
     await order.save();
@@ -81,7 +81,7 @@ const updateOrderStatus = async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: "Failed to update order status",
+      message: error.message,
     });
   }
 };
