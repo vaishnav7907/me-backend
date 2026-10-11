@@ -56,6 +56,7 @@ const createCheckout = async (req, res) => {
     }
 
     const existingUser = await authModel.findById(userId);
+    
     if (!existingUser) {
       return res
         .status(404)
@@ -148,6 +149,7 @@ const createCheckout = async (req, res) => {
         productId: existingProduct._id,
         name: existingProduct.name,
         image: selectedVariant.color?.mainImage?.url || "",
+        costPrice: existingProduct.costPrice,
         price: existingProduct.price,
         quantity: selectedQuantity,
 

@@ -45,6 +45,7 @@ const dressSchema = new mongoose.Schema(
       required: true,
     },
     price: { type: Number, required: true, min: 0 },
+    costPrice: { type: Number, required: true, min: 0 },
     realPrice: { type: Number, required: true, min: 0 },
     discount: { type: Number, default: 0, min: 0, max: 100 },
     sku: {

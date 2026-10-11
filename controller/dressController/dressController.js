@@ -222,6 +222,7 @@ const createDress = async (req, res) => {
       category,
       brand,
       price,
+      costPrice,
       realPrice,
       discount,
       sku,
@@ -250,6 +251,18 @@ const createDress = async (req, res) => {
       return res
         .status(400)
         .json({ success: false, message: "Price is required" });
+    }
+
+    if (
+      costPrice === undefined ||
+      costPrice === "" ||
+      !Number.isFinite(Number(costPrice)) ||
+      Number(costPrice) < 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Cost price must be a valid non-negative number",
+      });
     }
     if (realPrice === undefined || realPrice === "") {
       return res
@@ -396,6 +409,7 @@ const createDress = async (req, res) => {
       category,
       brand,
       price,
+      costPrice: Number(costPrice),
       realPrice,
       discount,
       sku,
@@ -452,6 +466,7 @@ const updateProducts = async (req, res) => {
       description,
       category,
       price,
+      costPrice,
       realPrice,
       discount,
       brand,
@@ -760,6 +775,19 @@ const updateProducts = async (req, res) => {
 
     if (price !== undefined && price !== "") {
       updateData.price = Number(price);
+    }
+
+    if (costPrice !== undefined && costPrice !== "") {
+      const parsedCostPrice = Number(costPrice);
+
+      if (!Number.isFinite(parsedCostPrice) || parsedCostPrice < 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Cost price must be a valid non-negative number",
+        });
+      }
+
+      updateData.costPrice = parsedCostPrice;
     }
 
     if (realPrice !== undefined && realPrice !== "") {
