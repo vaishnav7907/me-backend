@@ -40,8 +40,18 @@ const {
 const {
   createRazorpayOrder,
 } = require("../controller/payment/razorpayController/razorpayController");
-const { verifyRazorpayPayment } = require("../controller/payment/verifyRezorPay/verifyRezorPay");
-const { getAdminOrders, updateOrderStatus, bulkUpdateOrderStatus } = require("../controller/orderConfirmation/orderConfirmationController");
+const {
+  verifyRazorpayPayment,
+} = require("../controller/payment/verifyRezorPay/verifyRezorPay");
+const {
+  getAdminOrders,
+  updateOrderStatus,
+  bulkUpdateOrderStatus,
+} = require("../controller/orderConfirmation/orderConfirmationController");
+
+const {
+  getAdminAnalytics,
+} = require("../controller/analytics/analyticsController");
 
 const router = express.Router();
 
@@ -150,13 +160,20 @@ router.post("/Checkout", settingMiddleware, createCheckout);
 
 router.post("/createRazorpayOrder", createRazorpayOrder);
 
-router.post("/verifyRazorpayPayment",verifyRazorpayPayment)
-
+router.post("/verifyRazorpayPayment", verifyRazorpayPayment);
 
 // order status
 
-router.get("/getAdminOrder",getAdminOrders)
-router.patch("/updateOrderStatus/:id",settingMiddleware,updateOrderStatus)
-router.patch("/bulkUpdateOrderStatus",settingMiddleware,bulkUpdateOrderStatus)
+router.get("/getAdminOrder", getAdminOrders);
+router.patch("/updateOrderStatus/:id", settingMiddleware, updateOrderStatus);
+router.patch(
+  "/bulkUpdateOrderStatus",
+  settingMiddleware,
+  bulkUpdateOrderStatus,
+);
+
+// admin analysis
+router.get("/getAdminAnalytics", settingMiddleware, getAdminAnalytics);
+
 
 module.exports = router;

@@ -1,56 +1,9 @@
-// const checkoutModel = require("../../model/checkout/checkoutModel");
-
-// const TIME_ZONE = "Asia/Kolkata";
-
-// const getAdminAnalytics = async (req, res) => {
-//   try {
-//     const { period = "monthly" } = req.query;
-//     const now = new Date();
-
-//     const currentParts = new Intl.DateTimeFormat("en-US", {
-//       timeZone: TIME_ZONE,
-//       year: "numeric",
-//       month: "numeric",
-//     }).formatToParts(now);
-
-//     const currentYear = Number(
-//       currentParts.find((part) => part.type === "year").value,
-//     );
-//     const currentMonth = Number(
-//       currentParts.find((part) => part.type === "month").value,
-//     );
-
-//     const year =
-//       req.query.year === undefined ? currentYear : Number(req.query.year);
-
-//     const month =
-//       req.query.month === undefined ? currentMonth : Number(req.query.month);
-
-//     const formats = {
-//       daily: "%Y-%m-%d",
-//       monthly: "%Y-%m",
-//       yearly: "%Y",
-//     };
-
-//     if (!formats[period]) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Period must be daily, monthly, or yearly",
-//       });
-//     }
-//   } catch (error) {}
-// };
-
-
 const checkoutModel = require("../../model/checkout/checkoutModel");
-
-const TIME_ZONE = "Asia/Kolkata";
-const IST_OFFSET = 330 * 60 * 1000;
-
 const getAdminAnalytics = async (req, res) => {
+  const TIME_ZONE = "Asia/Kolkata";
+  const IST_OFFSET = 330 * 60 * 1000;
   try {
     const { period = "monthly" } = req.query;
-
     const now = new Date();
 
     const parts = new Intl.DateTimeFormat("en-US", {
@@ -92,25 +45,26 @@ const getAdminAnalytics = async (req, res) => {
     ) {
       return res.status(400).json({
         success: false,
-        message: "Invalid month",
+        message: "invalid month",
       });
     }
 
-    const toISTBoundary = (y, m, d = 1) =>
-      new Date(Date.UTC(y, m - 1, d) - IST_OFFSET);
+    const istTimeBoundary = (y, m, d = 1) => {
+      return new Date(Date.UTC(y, m - 1, d) - IST_OFFSET);
+    };
 
     let startDate;
     let endDate;
 
     if (period === "daily") {
-      startDate = toISTBoundary(year, month);
-      endDate = toISTBoundary(year, month + 1);
+      startDate = istTimeBoundary(year, month);
+      endDate = istTimeBoundary(year, month + 1);
     } else if (period === "monthly") {
-      startDate = toISTBoundary(year, 1);
-      endDate = toISTBoundary(year + 1, 1);
+      startDate = istTimeBoundary(year, 1);
+      endDate = istTimeBoundary(year + 1, 1);
     } else {
-      startDate = toISTBoundary(2000, 1);
-      endDate = toISTBoundary(year + 1, 1);
+      startDate = istTimeBoundary(2000, 1);
+      endDate = istTimeBoundary(year + 1, 1);
     }
 
     const dateFormat = {
@@ -119,21 +73,27 @@ const getAdminAnalytics = async (req, res) => {
       yearly: "%Y",
     };
 
-    const results = await checkoutModel.aggregate([
+    const companyCalculations = await checkoutModel.aggregate([
       {
         $match: {
           orderStatus: "Delivered",
+
           createdAt: {
             $gte: startDate,
             $lt: endDate,
           },
         },
       },
+
       {
         $addFields: {
           hasCostPrice: {
-            $isNumber: "$product.costPrice",
+            $and: [
+              { $isNumber: "$product.costPrice" },
+              { $gt: ["$product.costPrice", 0] },
+            ],
           },
+
           orderCost: {
             $multiply: [
               { $ifNull: ["$product.costPrice", 0] },
@@ -142,6 +102,7 @@ const getAdminAnalytics = async (req, res) => {
           },
         },
       },
+
       {
         $group: {
           _id: {
@@ -178,7 +139,6 @@ const getAdminAnalytics = async (req, res) => {
 
     if (period === "daily") {
       const daysInMonth = new Date(year, month, 0).getDate();
-
       labels = Array.from(
         { length: daysInMonth },
         (_, index) =>
@@ -197,8 +157,8 @@ const getAdminAnalytics = async (req, res) => {
 
     if (period === "yearly") {
       const firstYear =
-        results.length > 0
-          ? Math.min(...results.map((item) => Number(item._id)))
+        companyCalculations.length > 0
+          ? Math.min(...companyCalculations.map((item) => Number(item._id)))
           : year;
 
       labels = Array.from({ length: year - firstYear + 1 }, (_, index) =>
@@ -206,20 +166,18 @@ const getAdminAnalytics = async (req, res) => {
       );
     }
 
-    const resultMap = new Map(results.map((item) => [item._id, item]));
+    const resultMap = new Map(
+      companyCalculations.map((item) => [item._id, item]),
+    );
 
     const analytics = labels.map((label) => {
       const item = resultMap.get(label);
-
-      const hasCompleteCosts =
-        item && item.ordersWithCost === item.orderCount;
+      const hasCompleteCosts = item && item.ordersWithCost === item.orderCount;
 
       return {
         label,
         revenue: item?.revenue ?? 0,
-        profit: hasCompleteCosts
-          ? item.revenue - item.totalCost
-          : null,
+        profit: hasCompleteCosts ? item.revenue - item.totalCost : null,
         orderCount: item?.orderCount ?? 0,
       };
     });
@@ -234,12 +192,12 @@ const getAdminAnalytics = async (req, res) => {
       0,
     );
 
-    const profitAvailable = results.every(
+    const profitAvailable = companyCalculations.every(
       (item) => item.ordersWithCost === item.orderCount,
     );
 
     const totalProfit = profitAvailable
-      ? results.reduce(
+      ? companyCalculations.reduce(
           (total, item) => total + item.revenue - item.totalCost,
           0,
         )
@@ -247,6 +205,7 @@ const getAdminAnalytics = async (req, res) => {
 
     return res.status(200).json({
       success: true,
+
       period,
       year,
       ...(period === "daily" ? { month } : {}),
@@ -267,6 +226,4 @@ const getAdminAnalytics = async (req, res) => {
     });
   }
 };
-
 module.exports = { getAdminAnalytics };
-
