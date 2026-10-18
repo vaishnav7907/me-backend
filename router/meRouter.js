@@ -51,6 +51,7 @@ const {
 
 const {
   getAdminAnalytics,
+  previousMonthAnalysis,
 } = require("../controller/analytics/analyticsController");
 
 const router = express.Router();
@@ -175,5 +176,6 @@ router.patch(
 // admin analysis
 router.get("/getAdminAnalytics", settingMiddleware, getAdminAnalytics);
 
-
+// month profit or loss
+router.get("/previousMonthAnalysis",settingMiddleware,previousMonthAnalysis)
 module.exports = router;

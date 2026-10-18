@@ -226,4 +226,131 @@ const getAdminAnalytics = async (req, res) => {
     });
   }
 };
-module.exports = { getAdminAnalytics };
+
+// month profit or loss
+
+const IST_OFFSET = 330 * 60 * 1000;
+
+const getmonthRange = (year, month) => ({
+  start: new Date(Date.UTC(year, month - 1, 1) - IST_OFFSET),
+  end: new Date(Date.UTC(year, month, 1) - IST_OFFSET),
+});
+
+const calculateMonth = async (start, end) => {
+  const monthResult = await checkoutModel.aggregate([
+    {
+      $match: {
+        orderStatus: "Delevered",
+        createdAt: {
+          $gte: start,
+          $lt: end,
+        },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        revenue: {
+          $sum: { $ifNull: ["$totalAmound", 0] },
+        },
+        productCost: {
+          $sum: {
+            $multiply: [
+              { $ifNull: ["$product.costPrice", 0] },
+              { $ifNull: ["$product.quantity", 0] },
+            ],
+          },
+        },
+        totalOrders: { $sum: 1 },
+        missingCostPriceOrders: {
+          $sum: {
+            $cond: [
+              { $eq: [{ $type: "$product.costPrice" }, "missing"] },
+              1,
+              0,
+            ],
+          },
+        },
+      },
+    },
+  ]);
+
+  const data = monthResult[0] || {
+    revenue: 0,
+    productCost: 0,
+    totalOrders: 0,
+    missingCostPriceOrders: 0,
+  };
+
+  const profitOrLoss = data.revenue - data.productCost;
+
+  return {
+    revenue: data.revenue,
+    productCost: data.productCost,
+    profit: Math.max(profitOrLoss, 0),
+    loss: Math.max(-profitOrLoss, 0),
+    profitOrLoss,
+    totalOrders: data.totalOrders,
+    missingCostPriceOrders: data.missingCostPriceOrders,
+    profitMargin:
+      data.revenue > 0
+        ? Number(((profitOrLoss / data.revenue) * 100).toFixed(2))
+        : 0,
+  };
+};
+
+const previousMonthAnalysis = async (req, res) => {
+  const TIMEZONE = "Asia/Kolkata";
+  try {
+    const now = new Date();
+
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: TIMEZONE,
+      year: "numeric",
+      month: "numeric",
+    }).formatToParts(now);
+
+    const year = Number(parts.find((part) => part.type === "year").value);
+    const month = Number(parts.find((part) => part.type === "month").value);
+
+    const prevMonthDate = new Date(Date.UTC(year, month - 2, 1));
+
+    const previousYear = prevMonthDate.getUTCFullYear();
+    const previousMonth = prevMonthDate.getUTCMonth() + 1;
+    const previousRange = getmonthRange(previousYear, previousMonth);
+    const currentRange = getmonthRange(year, month);
+    const [previous, current] = await Promise.all([
+      calculateMonth(previousRange.start, previousRange.end),
+      calculateMonth(currentRange.start, currentRange.end),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      previousMonth: {
+        month: new Date(
+          Date.UTC(previousYear, previousMonth - 1, 1),
+        ).toLocaleDateString("en-IN", {
+          month: "long",
+          year: "numeric",
+          timeZone: "UTC",
+        }),
+        ...current,
+      },
+      comparison: {
+        revenueChange: current.revenue - previous.revenue,
+        profitOrLossChange: current.profitOrLoss - previous.profitOrLoss,
+      },
+    });
+  } catch (error) {
+    console.error("Previous month analysis error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to calculate previous month analysis",
+    });
+  }
+};
+
+
+
+module.exports = { getAdminAnalytics, previousMonthAnalysis };
