@@ -36,6 +36,7 @@ const {
   userSignUp,
   adminSignUp,
   userAdminLogin,
+
 } = require("../controller/authController/userAdminAuthentication/authenticationController");
 const {
   createRazorpayOrder,
@@ -53,6 +54,8 @@ const {
   getAdminAnalytics,
   previousMonthAnalysis,
 } = require("../controller/analytics/analyticsController");
+const { adminMiddleware } = require("../middleware/adminMiddleware");
+const { getAuthenticatedUsers } = require("../controller/customers/customersController");
 
 const router = express.Router();
 
@@ -177,5 +180,9 @@ router.patch(
 router.get("/getAdminAnalytics", settingMiddleware, getAdminAnalytics);
 
 // month profit or loss
-router.get("/previousMonthAnalysis",settingMiddleware,previousMonthAnalysis)
+router.get("/previousMonthAnalysis", settingMiddleware, previousMonthAnalysis);
+
+//get all customers by orders and details
+router.get("/getAuthenticatedUsers", adminMiddleware, getAuthenticatedUsers);
+
 module.exports = router;
