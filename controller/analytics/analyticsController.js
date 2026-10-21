@@ -351,6 +351,189 @@ const previousMonthAnalysis = async (req, res) => {
   }
 };
 
+const BUSINESS_START_YEAR = 2002;
+const getCompleteBusinessAnalysis = async (req, res) => {
+  try {
+    const currentYear = Number(
+      new Intl.DateTimeFormat("en", {
+        year: "numeric",
+        timeZone: "Asia/Kolkata",
+      }).format(new Date()),
+    );
 
+    const completeOrders = await checkoutModel.aggregate([
+      {
+        $match: {
+          orderStatus: "Delivered",
+        },
+      },
+      {
+        $addFields: {
+          orderRevenue: {
+            $ifNull: ["totalAmount", 0],
+          },
+          orderCost: {
+            $sum: {
+              $map: {
+                input: { $ifNull: ["$product", []] },
+                as: "item",
+                in: {
+                  $multiply: [
+                    { $ifNull: ["$$item.costPrice", 0] },
+                    { $ifNull: ["$$item.quantity", 0] },
+                  ],
+                },
+              },
+            },
+          },
+          orderQuantity: {
+            $sum: {
+              $map: {
+                input: { $ifNull: ["$product", []] },
+                as: "item",
+                in: { $ifNull: ["$product.quantity", 0] },
+              },
+            },
+          },
+        },
+      },
+      {
+        $addFields: {
+          orderProfit: {
+            $subtract: ["$orderRevenue", "$orderCost"],
+          },
+        },
+      },
+      {
+        $facet: {
+          summary: [
+            {
+              $group: {
+                _id: null,
+                lifetimeRevenue: { $sum: "$orderRevenue" },
+                lifetimeCost: { $sum: "$orderCost" },
+                lifetimeProfit: { $sum: "$orderProfit" },
+                totalOrders: { $sum: 1 },
+                productsSold: { $sum: "$orderQuantity" },
+                customers: { $addToSet: "$user" },
+              },
+            },
+            {
+              $project: {
+                _id: 0,
+                lifetimeRevenue: 1,
+                lifetimeCost: 1,
+                lifetimeProfit: 1,
+                totalOrders: 1,
+                productsSold: 1,
+                customers: { $size: "$customers" },
+              },
+            },
+          ],
+          yearlyProfit: [
+            {
+              $group: {
+                _id: {
+                  $year: {
+                    date: "$createdAt",
+                    timezone: "Asia/Kolkata",
+                  },
+                },
+                revenue: { $sum: "$orderRevenue" },
+                profit: { $sum: "$orderProfit" },
+              },
+            },
+            {
+              $sort: {
+                profit: -1,
+                _id: 1,
+              },
+            },
+            { $limit: 1 },
+          ],
+        },
+      },
+    ]);
 
+    const result = completeOrders[0];
+    const summary = result.summary[0] || {
+      lifetimeRevenue: 0,
+      lifetimeCost: 0,
+      lifetimeProfit: 0,
+      totalOrders: 0,
+      productsSold: 0,
+      customers: 0,
+    };
+
+    const revenue = summary.lifetimeRevenue;
+    const profit = summary.lifetimeProfit;
+    const lifetimeLossResult = await Checkout.aggregate([
+      {
+        $addFields: {
+          lossAmount: {
+            $max: [
+              0,
+              {
+                $subtract: [
+                  {
+                    $multiply: ["$product.costPrice", "$product.quantity"],
+                  },
+                  "$totalAmount",
+                ],
+              },
+            ],
+          },
+        },
+      },
+      {
+        $match: {
+          lossAmount: { $gt: 0 },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          lifetimeLoss: { $sum: "$lossAmount" },
+        },
+      },
+    ]);
+    const lifetimeLoss = lifetimeLossResult[0]?.lifetimeLoss || 0;
+
+    res.status(200).json({
+      success: true,
+      businessSince: BUSINESS_START_YEAR,
+      currentYear,
+      lifetimeRevenue: revenue,
+      lifetimeProfit: profit,
+      lifetimeLoss,
+      totalOrders: summary.totalOrders,
+      profitMargin:
+        revenue > 0 ? Number(((profit / revenue) * 100).toFixed(2)) : 0,
+      lossRatio:
+        revenue > 0 ? Number(((lifetimeLoss / revenue) * 100).toFixed(2)) : 0,
+      averageOrder:
+        summary.totalOrders > 0
+          ? Number((revenue / summary.totalOrders).toFixed(2))
+          : 0,
+      customers: summary.customers,
+      productsSold: summary.productsSold,
+      bestProfitYear: result.yearlyProfit[0]
+        ? {
+            year: result.yearlyProfit[0]._id,
+            profit: result.yearlyProfit[0].profit,
+          }
+        : {
+            year: null,
+            profit: 0,
+          },
+    });
+  } catch (error) {
+    console.error("Complete business analysis error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch complete business analysis",
+    });
+  }
+};
 module.exports = { getAdminAnalytics, previousMonthAnalysis };
