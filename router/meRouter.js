@@ -36,6 +36,8 @@ const {
   userSignUp,
   adminSignUp,
   userAdminLogin,
+  updateUser,
+  getUser,
 
 } = require("../controller/authController/userAdminAuthentication/authenticationController");
 const {
@@ -53,6 +55,7 @@ const {
 const {
   getAdminAnalytics,
   previousMonthAnalysis,
+  getCompleteBusinessAnalysis,
 } = require("../controller/analytics/analyticsController");
 const { adminMiddleware } = require("../middleware/adminMiddleware");
 const { getAuthenticatedUsers } = require("../controller/customers/customersController");
@@ -64,6 +67,11 @@ router.post("/userSignup", userSignUp);
 router.post("/adminSignup", adminSignUp);
 
 router.post("/userAdminLogin", userAdminLogin);
+
+router.patch("/updateUser/:id",settingMiddleware,updateUser)
+
+
+router.get("/getUser/:id",settingMiddleware,getUser)
 ///////--------------------------
 
 //dress route
@@ -184,5 +192,9 @@ router.get("/previousMonthAnalysis", settingMiddleware, previousMonthAnalysis);
 
 //get all customers by orders and details
 router.get("/getAuthenticatedUsers", adminMiddleware, getAuthenticatedUsers);
+
+// get all business analysis
+
+router.get("/getBussinessAnalysis",adminMiddleware,getCompleteBusinessAnalysis)
 
 module.exports = router;

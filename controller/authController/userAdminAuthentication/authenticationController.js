@@ -3,9 +3,9 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const userSignUp = async (req, res) => {
   try {
-    const { FullName, Email, Password, Phone } = req.body;
+    const { FullName, Email, Password, Phone, Age } = req.body;
 
-    if (!FullName || !Email || !Password || !Phone) {
+    if (!FullName || !Email || !Password || !Phone || !Age) {
       return res.status(400).json({
         success: false,
         message: "All fields are required",
@@ -36,6 +36,7 @@ const userSignUp = async (req, res) => {
       FullName,
       Email,
       Phone,
+      Age,
       Password: hashed,
       role: "user",
     });
@@ -48,6 +49,7 @@ const userSignUp = async (req, res) => {
         name: createUser.FullName,
         email: createUser.Email,
         phone: createUser.Phone,
+        Age: createUser.Age,
         role: createUser.role,
       },
     });
@@ -157,11 +159,98 @@ const userAdminLogin = async (req, res) => {
   }
 };
 
+const getUser = async (req, res) => {
+  try {
+    const { id } = req.params;
 
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required",
+      });
+    }
+
+    const getUserfn = await authModel.findById(id).select("-Password");
+
+    if (!getUserfn) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      user: getUserfn,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch user",
+      error: error.message,
+    });
+  }
+};
+
+const updateUser = async (req, res) => {
+  try {
+    const { FullName, Email, Password, Phone, Age } = req.body;
+    const { id } = req.params;
+
+    const updateFields = {};
+
+    if (FullName !== undefined) updateFields.FullName = FullName.trim();
+    if (Email !== undefined) updateFields.Email = Email.trim();
+    if (Phone !== undefined) updateFields.Phone = Phone;
+    if (Age !== undefined) updateFields.Age = Age;
+
+    if (typeof Password === "string" && Password.trim() !== "") {
+      updateFields.Password = await bcrypt.hash(Password, 10);
+    }
+
+    if (Object.keys(updateFields).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No fields provided to update",
+      });
+    }
+
+    const updatedUser = await authModel
+      .findByIdAndUpdate(
+        id,
+        { $set: updateFields },
+        {
+          new: true,
+          runValidators: true,
+        },
+      )
+      .select("-Password");
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "User updated successfully",
+      user: updatedUser,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update user",
+      error: error.message,
+    });
+  }
+};
 
 module.exports = {
   userSignUp,
   adminSignUp,
   userAdminLogin,
-  
+  updateUser,
+  getUser,
 };

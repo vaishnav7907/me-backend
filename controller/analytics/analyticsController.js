@@ -352,6 +352,8 @@ const previousMonthAnalysis = async (req, res) => {
 };
 
 const BUSINESS_START_YEAR = 2002;
+
+
 const getCompleteBusinessAnalysis = async (req, res) => {
   try {
     const currentYear = Number(
@@ -370,30 +372,16 @@ const getCompleteBusinessAnalysis = async (req, res) => {
       {
         $addFields: {
           orderRevenue: {
-            $ifNull: ["totalAmount", 0],
+            $ifNull: ["$totalAmount", 0],
           },
           orderCost: {
-            $sum: {
-              $map: {
-                input: { $ifNull: ["$product", []] },
-                as: "item",
-                in: {
-                  $multiply: [
-                    { $ifNull: ["$$item.costPrice", 0] },
-                    { $ifNull: ["$$item.quantity", 0] },
-                  ],
-                },
-              },
-            },
+            $multiply: [
+              { $ifNull: ["$product.costPrice", 0] },
+              { $ifNull: ["$product.quantity", 0] },
+            ],
           },
           orderQuantity: {
-            $sum: {
-              $map: {
-                input: { $ifNull: ["$product", []] },
-                as: "item",
-                in: { $ifNull: ["$product.quantity", 0] },
-              },
-            },
+            $ifNull: ["$product.quantity", 0],
           },
         },
       },
@@ -401,6 +389,14 @@ const getCompleteBusinessAnalysis = async (req, res) => {
         $addFields: {
           orderProfit: {
             $subtract: ["$orderRevenue", "$orderCost"],
+          },
+          orderLoss: {
+            $max: [
+              0,
+              {
+                $subtract: ["$orderCost", "$orderRevenue"],
+              },
+            ],
           },
         },
       },
@@ -410,12 +406,27 @@ const getCompleteBusinessAnalysis = async (req, res) => {
             {
               $group: {
                 _id: null,
-                lifetimeRevenue: { $sum: "$orderRevenue" },
-                lifetimeCost: { $sum: "$orderCost" },
-                lifetimeProfit: { $sum: "$orderProfit" },
-                totalOrders: { $sum: 1 },
-                productsSold: { $sum: "$orderQuantity" },
-                customers: { $addToSet: "$user" },
+                lifetimeRevenue: {
+                  $sum: "$orderRevenue",
+                },
+                lifetimeCost: {
+                  $sum: "$orderCost",
+                },
+                lifetimeProfit: {
+                  $sum: "$orderProfit",
+                },
+                lifetimeLoss: {
+                  $sum: "$orderLoss",
+                },
+                totalOrders: {
+                  $sum: 1,
+                },
+                productsSold: {
+                  $sum: "$orderQuantity",
+                },
+                customers: {
+                  $addToSet: "$user",
+                },
               },
             },
             {
@@ -424,12 +435,66 @@ const getCompleteBusinessAnalysis = async (req, res) => {
                 lifetimeRevenue: 1,
                 lifetimeCost: 1,
                 lifetimeProfit: 1,
+                lifetimeLoss: 1,
                 totalOrders: 1,
                 productsSold: 1,
-                customers: { $size: "$customers" },
+                customers: {
+                  $size: "$customers",
+                },
               },
             },
           ],
+
+          yearlyData: [
+            {
+              $group: {
+                _id: {
+                  $year: {
+                    date: "$createdAt",
+                    timezone: "Asia/Kolkata",
+                  },
+                },
+                revenue: {
+                  $sum: "$orderRevenue",
+                },
+                profit: {
+                  $sum: "$orderProfit",
+                },
+                loss: {
+                  $sum: "$orderLoss",
+                },
+                orders: {
+                  $sum: 1,
+                },
+                productsSold: {
+                  $sum: "$orderQuantity",
+                },
+                customers: {
+                  $addToSet: "$user",
+                },
+              },
+            },
+            {
+              $project: {
+                _id: 0,
+                year: "$_id",
+                revenue: 1,
+                profit: 1,
+                loss: 1,
+                orders: 1,
+                productsSold: 1,
+                customers: {
+                  $size: "$customers",
+                },
+              },
+            },
+            {
+              $sort: {
+                year: 1,
+              },
+            },
+          ],
+
           yearlyProfit: [
             {
               $group: {
@@ -439,8 +504,9 @@ const getCompleteBusinessAnalysis = async (req, res) => {
                     timezone: "Asia/Kolkata",
                   },
                 },
-                revenue: { $sum: "$orderRevenue" },
-                profit: { $sum: "$orderProfit" },
+                profit: {
+                  $sum: "$orderProfit",
+                },
               },
             },
             {
@@ -449,17 +515,21 @@ const getCompleteBusinessAnalysis = async (req, res) => {
                 _id: 1,
               },
             },
-            { $limit: 1 },
+            {
+              $limit: 1,
+            },
           ],
         },
       },
     ]);
 
     const result = completeOrders[0];
-    const summary = result.summary[0] || {
+
+    const summary = result?.summary?.[0] || {
       lifetimeRevenue: 0,
       lifetimeCost: 0,
       lifetimeProfit: 0,
+      lifetimeLoss: 0,
       totalOrders: 0,
       productsSold: 0,
       customers: 0,
@@ -467,57 +537,40 @@ const getCompleteBusinessAnalysis = async (req, res) => {
 
     const revenue = summary.lifetimeRevenue;
     const profit = summary.lifetimeProfit;
-    const lifetimeLossResult = await Checkout.aggregate([
-      {
-        $addFields: {
-          lossAmount: {
-            $max: [
-              0,
-              {
-                $subtract: [
-                  {
-                    $multiply: ["$product.costPrice", "$product.quantity"],
-                  },
-                  "$totalAmount",
-                ],
-              },
-            ],
-          },
-        },
-      },
-      {
-        $match: {
-          lossAmount: { $gt: 0 },
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          lifetimeLoss: { $sum: "$lossAmount" },
-        },
-      },
-    ]);
-    const lifetimeLoss = lifetimeLossResult[0]?.lifetimeLoss || 0;
+    const lifetimeLoss = summary.lifetimeLoss;
 
     res.status(200).json({
       success: true,
       businessSince: BUSINESS_START_YEAR,
       currentYear,
+
       lifetimeRevenue: revenue,
+      lifetimeCost: summary.lifetimeCost,
       lifetimeProfit: profit,
       lifetimeLoss,
+
       totalOrders: summary.totalOrders,
+      productsSold: summary.productsSold,
+      customers: summary.customers,
+
       profitMargin:
-        revenue > 0 ? Number(((profit / revenue) * 100).toFixed(2)) : 0,
+        revenue > 0
+          ? Number(((profit / revenue) * 100).toFixed(2))
+          : 0,
+
       lossRatio:
-        revenue > 0 ? Number(((lifetimeLoss / revenue) * 100).toFixed(2)) : 0,
+        revenue > 0
+          ? Number(((lifetimeLoss / revenue) * 100).toFixed(2))
+          : 0,
+
       averageOrder:
         summary.totalOrders > 0
           ? Number((revenue / summary.totalOrders).toFixed(2))
           : 0,
-      customers: summary.customers,
-      productsSold: summary.productsSold,
-      bestProfitYear: result.yearlyProfit[0]
+
+      yearlyData: result?.yearlyData || [],
+
+      bestProfitYear: result?.yearlyProfit?.[0]
         ? {
             year: result.yearlyProfit[0]._id,
             profit: result.yearlyProfit[0].profit,
@@ -536,4 +589,6 @@ const getCompleteBusinessAnalysis = async (req, res) => {
     });
   }
 };
-module.exports = { getAdminAnalytics, previousMonthAnalysis };
+
+
+module.exports = { getAdminAnalytics, previousMonthAnalysis, getCompleteBusinessAnalysis };

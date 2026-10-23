@@ -4,10 +4,11 @@ const authSchema = new mongoose.Schema({
   FullName: { type: String, required: true, unique: true },
   Email: { type: String, required: true, unique: true },
   Password: { type: String, required: true },
-  role:{type:String,enum:["user","admin"],default:"user"},
-  Phone: { type: String, default: "", },
+  Age: { type: Number, required: true, min: 0 },
+  role: { type: String, enum: ["user", "admin"], default: "user" },
+  Phone: { type: String, default: "" },
 });
 
-const authModel = mongoose.model("Authentication",authSchema)
+const authModel = mongoose.model("Authentication", authSchema);
 
-module.exports=authModel
+module.exports = authModel;
