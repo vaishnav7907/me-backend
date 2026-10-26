@@ -58,7 +58,8 @@ const {
   getCompleteBusinessAnalysis,
 } = require("../controller/analytics/analyticsController");
 const { adminMiddleware } = require("../middleware/adminMiddleware");
-const { getAuthenticatedUsers } = require("../controller/customers/customersController");
+const { getAuthenticatedUsers, getUsersByAge } = require("../controller/customers/customersController");
+const { getTopProducts } = require("../controller/topProducts/topProducts");
 
 const router = express.Router();
 
@@ -72,6 +73,9 @@ router.patch("/updateUser/:id",settingMiddleware,updateUser)
 
 
 router.get("/getUser/:id",settingMiddleware,getUser)
+
+
+
 ///////--------------------------
 
 //dress route
@@ -193,8 +197,16 @@ router.get("/previousMonthAnalysis", settingMiddleware, previousMonthAnalysis);
 //get all customers by orders and details
 router.get("/getAuthenticatedUsers", adminMiddleware, getAuthenticatedUsers);
 
+
+// get users by age
+
+router.get("/getUsersByAge",adminMiddleware,getUsersByAge)
 // get all business analysis
 
 router.get("/getBussinessAnalysis",adminMiddleware,getCompleteBusinessAnalysis)
+
+// get top products
+
+router.get("/getTopProducts",adminMiddleware,getTopProducts)
 
 module.exports = router;
