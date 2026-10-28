@@ -60,6 +60,7 @@ const {
 const { adminMiddleware } = require("../middleware/adminMiddleware");
 const { getAuthenticatedUsers, getUsersByAge } = require("../controller/customers/customersController");
 const { getTopProducts } = require("../controller/topProducts/topProducts");
+const { addToCartFn, getCartItems, removeFromCart } = require("../controller/addToCart/addToCart");
 
 const router = express.Router();
 
@@ -208,5 +209,15 @@ router.get("/getBussinessAnalysis",adminMiddleware,getCompleteBusinessAnalysis)
 // get top products
 
 router.get("/getTopProducts",adminMiddleware,getTopProducts)
+
+
+// cart
+
+router.post("/addToCart/:id",settingMiddleware,addToCartFn)
+
+router.get("/getCartItems",settingMiddleware,getCartItems)
+
+router.delete("/removeCartItem/:itemId",settingMiddleware,removeFromCart)
+
 
 module.exports = router;
