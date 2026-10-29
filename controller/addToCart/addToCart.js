@@ -89,7 +89,12 @@ const addToCartFn = async (req, res) => {
     }
 
     await cart.save();
-    await cart.populate("items.product");
+    await cart.populate({
+      path: "items.product",
+      populate: {
+        path: "brand",
+      },
+    });
 
     res.status(200).json({
       message: "Product added to cart successfully",
@@ -114,9 +119,12 @@ const getCartItems = async (req, res) => {
       return res.status(400).json({ message: "Invalid user ID" });
     }
 
-    const cart = await cartModel
-      .findOne({ user: userId })
-      .populate("items.product");
+    const cart = await cartModel.findOne({ user: userId }).populate({
+      path: "items.product",
+      populate: {
+        path: "brand",
+      },
+    });
 
     return res.status(200).json({
       message: "Cart fetched successfully",
@@ -160,7 +168,12 @@ const removeFromCart = async (req, res) => {
 
     cart.items.pull({ _id: itemId });
     await cart.save();
-    await cart.populate("items.product");
+    await cart.populate({
+      path: "items.product",
+      populate: {
+        path: "brand",
+      },
+    });
 
     return res.status(200).json({
       message: "Product removed successfully",
@@ -173,4 +186,4 @@ const removeFromCart = async (req, res) => {
     });
   }
 };
-module.exports = { addToCartFn, getCartItems,removeFromCart };
+module.exports = { addToCartFn, getCartItems, removeFromCart };
