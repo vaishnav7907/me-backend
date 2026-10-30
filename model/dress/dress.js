@@ -47,6 +47,18 @@ const dressSchema = new mongoose.Schema(
     price: { type: Number, required: true, min: 0 },
     costPrice: { type: Number, required: true, min: 0 },
     realPrice: { type: Number, required: true, min: 0 },
+    isHandPicked: {
+      type: Boolean,
+      default: false,
+    },
+    handPickedLabel: {
+      type: String,
+      default: "",
+    },
+    handPickedDescription: {
+      type: String,
+      default: "",
+    },
     discount: { type: Number, default: 0, min: 0, max: 100 },
     sku: {
       type: String,

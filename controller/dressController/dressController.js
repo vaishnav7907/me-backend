@@ -229,6 +229,9 @@ const createDress = async (req, res) => {
       status,
       details,
       variants,
+      isHandPicked,
+      handPickedLabel,
+      handPickedDescription,
     } = req.body;
 
     if (!brand) {
@@ -416,6 +419,9 @@ const createDress = async (req, res) => {
       status,
       details: parsedDetails,
       variants: finalVariants,
+      isHandPicked: isHandPicked === "true" || isHandPicked === true,
+      handPickedLabel: handPickedLabel || "",
+      handPickedDescription: handPickedDescription || "",
     });
 
     const product = await dressModel
@@ -474,6 +480,9 @@ const updateProducts = async (req, res) => {
       variants,
       sku,
       status,
+      isHandPicked,
+      handPickedLabel,
+      handPickedDescription,
     } = req.body;
 
     const { id } = req.params;
@@ -818,6 +827,28 @@ const updateProducts = async (req, res) => {
       updateData.status = status;
     }
 
+    if (isHandPicked !== undefined) {
+      if (![true, false, "true", "false"].includes(isHandPicked)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid Handpicked value",
+        });
+      }
+
+      updateData.isHandPicked =
+        isHandPicked === true || isHandPicked === "true";
+    }
+
+    if (handPickedLabel !== undefined) {
+      updateData.handPickedLabel = String(handPickedLabel ?? "").trim();
+    }
+
+    if (handPickedDescription !== undefined) {
+      updateData.handPickedDescription = String(
+        handPickedDescription ?? "",
+      ).trim();
+    }
+
     const finalPrice =
       updateData.price !== undefined ? updateData.price : existProduct.price;
 
@@ -830,6 +861,23 @@ const updateProducts = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Real price should be greater than or equal to selling price",
+      });
+    }
+
+    const finalIsHandPicked =
+      updateData.isHandPicked !== undefined
+        ? updateData.isHandPicked
+        : existProduct.isHandPicked;
+
+    const finalHandPickedLabel =
+      updateData.handPickedLabel !== undefined
+        ? updateData.handPickedLabel
+        : existProduct.handPickedLabel;
+
+    if (finalIsHandPicked && !String(finalHandPickedLabel ?? "").trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Handpicked label is required",
       });
     }
 

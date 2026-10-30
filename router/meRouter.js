@@ -38,7 +38,6 @@ const {
   userAdminLogin,
   updateUser,
   getUser,
-
 } = require("../controller/authController/userAdminAuthentication/authenticationController");
 const {
   createRazorpayOrder,
@@ -58,9 +57,22 @@ const {
   getCompleteBusinessAnalysis,
 } = require("../controller/analytics/analyticsController");
 const { adminMiddleware } = require("../middleware/adminMiddleware");
-const { getAuthenticatedUsers, getUsersByAge } = require("../controller/customers/customersController");
+const {
+  getAuthenticatedUsers,
+  getUsersByAge,
+} = require("../controller/customers/customersController");
 const { getTopProducts } = require("../controller/topProducts/topProducts");
-const { addToCartFn, getCartItems, removeFromCart } = require("../controller/addToCart/addToCart");
+const {
+  addToCartFn,
+  getCartItems,
+  removeFromCart,
+} = require("../controller/addToCart/addToCart");
+const {
+  createOffer,
+  updateOffer,
+  getOffer,
+  removeOffer,
+} = require("../controller/offerSaleController/offerSaleController");
 
 const router = express.Router();
 
@@ -70,12 +82,9 @@ router.post("/adminSignup", adminSignUp);
 
 router.post("/userAdminLogin", userAdminLogin);
 
-router.patch("/updateUser/:id",settingMiddleware,updateUser)
+router.patch("/updateUser/:id", settingMiddleware, updateUser);
 
-
-router.get("/getUser/:id",settingMiddleware,getUser)
-
-
+router.get("/getUser/:id", settingMiddleware, getUser);
 
 ///////--------------------------
 
@@ -198,26 +207,34 @@ router.get("/previousMonthAnalysis", settingMiddleware, previousMonthAnalysis);
 //get all customers by orders and details
 router.get("/getAuthenticatedUsers", adminMiddleware, getAuthenticatedUsers);
 
-
 // get users by age
 
-router.get("/getUsersByAge",adminMiddleware,getUsersByAge)
+router.get("/getUsersByAge", adminMiddleware, getUsersByAge);
 // get all business analysis
 
-router.get("/getBussinessAnalysis",adminMiddleware,getCompleteBusinessAnalysis)
+router.get(
+  "/getBussinessAnalysis",
+  adminMiddleware,
+  getCompleteBusinessAnalysis,
+);
 
 // get top products
 
-router.get("/getTopProducts",adminMiddleware,getTopProducts)
-
+router.get("/getTopProducts", adminMiddleware, getTopProducts);
 
 // cart
 
-router.post("/addToCart/:id",settingMiddleware,addToCartFn)
+router.post("/addToCart/:id", settingMiddleware, addToCartFn);
 
-router.get("/getCartItems",settingMiddleware,getCartItems)
+router.get("/getCartItems", settingMiddleware, getCartItems);
 
-router.delete("/removeCartItem/:itemId",settingMiddleware,removeFromCart)
+router.delete("/removeCartItem/:itemId", settingMiddleware, removeFromCart);
 
+// offer
+
+router.post("/createOffer", createOffer);
+router.patch("/updateOffer/:id", updateOffer);
+router.get("/getOffers", getOffer);
+router.delete("/removeOffer/:id", removeOffer);
 
 module.exports = router;
