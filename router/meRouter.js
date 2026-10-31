@@ -232,9 +232,9 @@ router.delete("/removeCartItem/:itemId", settingMiddleware, removeFromCart);
 
 // offer
 
-router.post("/createOffer", createOffer);
-router.patch("/updateOffer/:id", updateOffer);
+router.post("/createOffer",adminMiddleware, createOffer);
+router.patch("/updateOffer/:id",adminMiddleware, updateOffer);
 router.get("/getOffers", getOffer);
-router.delete("/removeOffer/:id", removeOffer);
+router.delete("/removeOffer/:id",adminMiddleware, removeOffer);
 
 module.exports = router;

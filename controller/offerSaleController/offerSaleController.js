@@ -14,11 +14,24 @@ const createOffer = async (req, res) => {
       status,
       applicableTo,
       category,
+      products,
     } = req.body;
 
     if (!title || !description || !discountType || !startDate || !endDate) {
       return res.status(400).json({
         message: "Please fill all required fields",
+      });
+    }
+
+    if (!["percentage", "fixed", "buy_x_get_y"].includes(discountType)) {
+      return res.status(400).json({
+        message: "Invalid discount type",
+      });
+    }
+
+    if (!["All", "Category", "Products"].includes(applicableTo)) {
+      return res.status(400).json({
+        message: "Invalid applicable type",
       });
     }
 
@@ -58,6 +71,14 @@ const createOffer = async (req, res) => {
       });
     }
 
+    if (
+      applicableTo === "Products" &&
+      (!Array.isArray(products) || products.length === 0)
+    ) {
+      return res.status(400).json({
+        message: "Please select at least one product",
+      });
+    }
     const offer = await offerModel.create({
       title,
       description,
@@ -70,6 +91,7 @@ const createOffer = async (req, res) => {
       status,
       applicableTo,
       category,
+      products: applicableTo === "Products" ? products : [],
     });
 
     res.status(201).json({

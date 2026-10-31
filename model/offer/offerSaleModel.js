@@ -56,7 +56,7 @@ const offerSchema = new mongoose.Schema(
 
     applicableTo: {
       type: String,
-      enum: ["All", "Category"],
+      enum: ["All", "Category","Products"],
       default: "All",
     },
 
