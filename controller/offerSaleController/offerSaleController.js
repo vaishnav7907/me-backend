@@ -1,5 +1,6 @@
 const offerModel = require("../../model/offer/offerSaleModel");
-const mongoose = require("mongoose")
+const mongoose = require("mongoose");
+const dressModel = require("../../model/dress/dress");
 const createOffer = async (req, res) => {
   try {
     const {
@@ -143,14 +144,111 @@ const updateOffer = async (req, res) => {
   }
 };
 
+const calculateOfferPrice = (product, offers) => {
+  let bestOffer = null;
+  let lowestPrice = product.price;
+  const currentDate = new Date();
+
+  for (const offer of offers) {
+    //  checking offer status
+    if (offer.status !== "Active") {
+      continue;
+    }
+
+    // Check offer start and end dates
+    if (
+      new Date(offer.startDate) > currentDate ||
+      new Date(offer.endDate) < currentDate
+    ) {
+      continue;
+    }
+
+    // Check whether offer applies to this product
+    let isApplicable = false;
+
+    if (offer.applicableTo === "All") {
+      isApplicable = true;
+    } else if (offer.applicableTo === "Category") {
+      if (offer.category?.toLowerCase() === product.category?.toLowerCase()) {
+        isApplicable = true;
+      }
+    } else if (offer.applicableTo === "Products") {
+      if (
+        offer.products.some((id) => id.toString() === product._id.toString())
+      ) {
+        isApplicable = true;
+      }
+    }
+
+    if (!isApplicable) {
+      continue;
+    }
+
+    // calculate discount
+    let discount = 0;
+
+    if (offer.discountType === "percentage") {
+      discount = (product.price * offer.discountValue) / 100;
+    } else if (offer.discountType === "fixed") {
+      discount = offer.discountValue;
+    } else {
+      // Buy X Get Y is handled separately in cart
+      continue;
+    }
+
+    // calculate final price
+
+    const finalPrice = Math.max(0, product.price - discount);
+
+    // select the best offer
+
+    if (finalPrice < lowestPrice) {
+      lowestPrice = finalPrice;
+      bestOffer = offer;
+    }
+  }
+
+  return {
+    originalPrice: product.price,
+    offerPrice: Math.round(lowestPrice),
+    offerApplied: bestOffer !== null,
+    appliedOffer: bestOffer
+      ? {
+          _id: bestOffer._id,
+          title: bestOffer.title,
+          discountType: bestOffer.discountType,
+          discountValue: bestOffer.discountValue,
+        }
+      : null,
+  };
+};
+
 const getOffer = async (req, res) => {
   try {
-    const getOfferFn = await offerModel.find().sort({ createdAt: -1 });
+    const currentDate = new Date();
+    // get products
+    const products = await dressModel.find().populate("brand");
+    const activeOffers = await offerModel.find({
+      status: "Active",
+      startDate: { $lte: currentDate },
+      endDate: { $gte: currentDate },
+    });
 
-    res.status(200).json({
+    // Calculate offer price for every product
+
+    const updatedProducts = products.map((product) => {
+      const productData = product.toObject();
+      const pricing = calculateOfferPrice(productData, activeOffers);
+      return {
+        ...productData,
+        ...pricing,
+      };
+    });
+
+    return res.status(200).json({
       success: true,
-      count: getOfferFn.length,
-      getOfferData: getOfferFn,
+      message: "Products fetched successfully",
+      products: updatedProducts,
     });
   } catch (error) {
     res.status(500).json({
