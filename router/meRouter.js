@@ -72,6 +72,7 @@ const {
   updateOffer,
   getOffer,
   removeOffer,
+  getProductsWithOffers,
 } = require("../controller/offerSaleController/offerSaleController");
 
 const router = express.Router();
@@ -233,8 +234,9 @@ router.delete("/removeCartItem/:itemId", settingMiddleware, removeFromCart);
 // offer
 
 router.post("/createOffer",adminMiddleware, createOffer);
-router.patch("/updateOffer/:id",adminMiddleware, updateOffer);
+// router.patch("/updateOffer/:id",adminMiddleware, updateOffer);
 router.get("/getOffers", getOffer);
+// router.get("/getProductsWithOffers",getProductsWithOffers)
 router.delete("/removeOffer/:id",adminMiddleware, removeOffer);
 
 module.exports = router;

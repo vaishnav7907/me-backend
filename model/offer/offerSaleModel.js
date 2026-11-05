@@ -1,3 +1,4 @@
+
 const mongoose = require("mongoose");
 
 const offerSchema = new mongoose.Schema(
@@ -56,22 +57,52 @@ const offerSchema = new mongoose.Schema(
 
     applicableTo: {
       type: String,
-      enum: ["All", "Category","Products"],
-      default: "All",
+      enum: ["All Products", "Category", "Products"],
+      default: "All Products",
     },
 
     category: {
       type: String,
       default: "",
     },
+
     products: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "dress",
       },
     ],
+
+    productPricing: [
+      {
+        product: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "dress",
+          required: true,
+        },
+
+        originalPrice: {
+          type: Number,
+          required: true,
+          min: 0,
+        },
+
+        discountPercentage: {
+          type: Number,
+          required: true,
+          min: 0,
+          max: 100,
+        },
+
+        finalPrice: {
+          type: Number,
+          required: true,
+          min: 0,
+        },
+      },
+    ],
   },
-  { timestamps: true },
+  { timestamps: true }
 );
 
 module.exports = mongoose.model("Offer", offerSchema);
