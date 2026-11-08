@@ -20,22 +20,30 @@ const createOffer = async (req, res) => {
 
     let { products } = req.body;
 
-    // basic validation
-    if (!title || !description || !discountType || !startDate || !endDate) {
+    // 1. Basic validation
+    if (
+      !title?.trim() ||
+      !description?.trim() ||
+      !discountType ||
+      !startDate ||
+      !endDate ||
+      !applicableTo
+    ) {
       return res.status(400).json({
         success: false,
         message: "Please provide all required fields",
       });
     }
 
+    // 2. Validate status
     if (status !== undefined && !["Active", "Inactive"].includes(status)) {
       return res.status(400).json({
         success: false,
         message: "Invalid offer status",
       });
     }
-    // Convert products into array if received as JSON string
 
+    // 3. Convert products string into array
     if (typeof products === "string") {
       try {
         products = JSON.parse(products);
@@ -57,6 +65,8 @@ const createOffer = async (req, res) => {
         message: "Products must be an array",
       });
     }
+
+    // 4. Validate discount type
     if (!["percentage", "fixed", "buy_x_get_y"].includes(discountType)) {
       return res.status(400).json({
         success: false,
@@ -68,23 +78,29 @@ const createOffer = async (req, res) => {
     const buy = Number(buyQuantity || 0);
     const get = Number(getQuantity || 0);
 
-    if (discountType === "percentage" && (discount <= 0 || discount > 100)) {
+    // 5. Percentage validation
+    if (
+      discountType === "percentage" &&
+      (!Number.isFinite(discount) || discount <= 0 || discount > 100)
+    ) {
       return res.status(400).json({
         success: false,
         message: "Percentage must be between 1 and 100",
       });
     }
 
+    // 6. Fixed discount validation
     if (
-      discountType !== "buy_x_get_y" &&
+      discountType === "fixed" &&
       (!Number.isFinite(discount) || discount <= 0)
     ) {
       return res.status(400).json({
         success: false,
-        message: "Please provide a valid discount value",
+        message: "Please provide a valid fixed discount",
       });
     }
 
+    // 7. Buy X Get Y validation
     if (
       discountType === "buy_x_get_y" &&
       (!Number.isInteger(buy) || !Number.isInteger(get) || buy <= 0 || get <= 0)
@@ -95,6 +111,7 @@ const createOffer = async (req, res) => {
       });
     }
 
+    // 8. Validate dates
     const offerStart = new Date(startDate);
     const offerEnd = new Date(endDate);
 
@@ -109,7 +126,7 @@ const createOffer = async (req, res) => {
       });
     }
 
-    //  Validate applicableTo
+    // 9. Validate applicability
     if (!["All Products", "Category", "Products"].includes(applicableTo)) {
       return res.status(400).json({
         success: false,
@@ -117,13 +134,7 @@ const createOffer = async (req, res) => {
       });
     }
 
-    if (applicableTo === "Category" && !category) {
-      return res.status(400).json({
-        success: false,
-        message: "Please select a category",
-      });
-    }
-
+    // 10. Validate category
     const allowedCategories = [
       "Shirts",
       "T-Shirts",
@@ -133,15 +144,25 @@ const createOffer = async (req, res) => {
       "Shorts",
     ];
 
-    if (applicableTo === "Category" && !allowedCategories.includes(category)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid category",
-      });
-    }
-    // product pricing
+    if (applicableTo === "Category") {
+      if (!category) {
+        return res.status(400).json({
+          success: false,
+          message: "Please select a category",
+        });
+      }
 
+      if (!allowedCategories.includes(category)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid category",
+        });
+      }
+    }
+
+    // 11. Selected product handling
     let productPricing = [];
+    let selectedProductIds = [];
 
     if (applicableTo === "Products") {
       if (products.length === 0) {
@@ -151,72 +172,83 @@ const createOffer = async (req, res) => {
         });
       }
 
-      if (discountType !== "percentage") {
+      // Fixed discount is not supported for selected products
+      if (discountType === "fixed") {
         return res.status(400).json({
           success: false,
-          message:
-            "Individual product pricing currently supports percentage offers only",
+          message: "Fixed discount is not supported for selected products",
         });
       }
 
-      // Validate product IDs
+      // Remove duplicate product IDs
+      selectedProductIds = [...new Set(products.map(String))];
 
-      const uniqueProducts = [...new Set(products.map(String))]; //set is used to remove duplicate. in this case it removes product ids using set
-      if (uniqueProducts.some((id) => !mongoose.Types.ObjectId.isValid(id))) {
+      // Validate product IDs
+      if (
+        selectedProductIds.some((id) => !mongoose.Types.ObjectId.isValid(id))
+      ) {
         return res.status(400).json({
           success: false,
           message: "Invalid product ID",
         });
       }
 
-      // fetch selected products
-
+      // Fetch selected products from database
       const selectedProducts = await dressModel.find({
-        _id: { $in: uniqueProducts },
+        _id: { $in: selectedProductIds },
       });
-      if (selectedProducts.length !== uniqueProducts.length) {
+
+      if (selectedProducts.length !== selectedProductIds.length) {
         return res.status(404).json({
           success: false,
           message: "One or more selected products were not found",
         });
       }
 
-      // Calculate individual final prices
+      // Calculate final prices for percentage offers
+      if (discountType === "percentage") {
+        productPricing = selectedProducts.map((product) => {
+          const originalPrice = Number(product.price);
 
-      productPricing = selectedProducts.map((product) => {
-        const originalPrice = Number(product.price);
+          const finalPrice = Number(
+            (originalPrice - (originalPrice * discount) / 100).toFixed(2),
+          );
 
-        const finalPrice = Number(
-          (originalPrice - (originalPrice * discount) / 100).toFixed(2),
-        );
-
-        return {
-          product: product._id,
-          originalPrice,
-          discountPercentage: discount,
-          finalPrice,
-        };
-      });
-
-      products = uniqueProducts;
+          return {
+            product: product._id,
+            originalPrice,
+            discountPercentage: discount,
+            finalPrice,
+          };
+        });
+      }
     }
 
+    // 12. Create offer
     const createOfferFn = await offerModel.create({
-      title,
-      description,
+      title: title.trim(),
+      description: description.trim(),
+
       discountType,
       discountValue: discount,
       buyQuantity: buy,
       getQuantity: get,
+
       startDate: offerStart,
       endDate: offerEnd,
+
       status: status || "Inactive",
+
       applicableTo,
+
       category: applicableTo === "Category" ? category : "",
-      products: applicableTo === "Products" ? products : [],
+
+      products: applicableTo === "Products" ? selectedProductIds : [],
+
       productPricing,
     });
 
+    // 13. Success response
     return res.status(201).json({
       success: true,
       message: "Offer created successfully",
@@ -233,10 +265,13 @@ const createOffer = async (req, res) => {
   }
 };
 
+module.exports = { createOffer };
+
 const updateOffer = async (req, res) => {
   try {
     const { id } = req.params;
 
+    // 1. Validate offer ID
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
         success: false,
@@ -244,6 +279,7 @@ const updateOffer = async (req, res) => {
       });
     }
 
+    // 2. Find existing offer
     const existingOffer = await offerModel.findById(id);
 
     if (!existingOffer) {
@@ -253,7 +289,8 @@ const updateOffer = async (req, res) => {
       });
     }
 
-    const {
+    // 3. Get request data
+    let {
       title,
       description,
       discountType,
@@ -265,124 +302,106 @@ const updateOffer = async (req, res) => {
       status,
       applicableTo,
       category,
+      products,
     } = req.body;
 
-    let products =
-      req.body.products !== undefined
-        ? req.body.products
-        : existingOffer.products;
-
-    if (typeof products === "string") {
-      try {
-        products = JSON.parse(products);
-      } catch (error) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid products data",
-        });
-      }
-    }
-
-    if (!Array.isArray(products)) {
-      return res.status(400).json({
-        success: false,
-        message: "Products must be an array",
-      });
-    }
-
-    const updatedData = {
-      title: title ?? existingOffer.title,
-      description: description ?? existingOffer.description,
-      discountType: discountType ?? existingOffer.discountType,
-      discountValue: Number(discountValue ?? existingOffer.discountValue),
-      buyQuantity: Number(buyQuantity ?? existingOffer.buyQuantity ?? 0),
-      getQuantity: Number(getQuantity ?? existingOffer.getQuantity ?? 0),
-      startDate: new Date(startDate ?? existingOffer.startDate),
-      endDate: new Date(endDate ?? existingOffer.endDate),
-      status: status ?? existingOffer.status,
-      applicableTo: applicableTo ?? existingOffer.applicableTo,
-    };
-
+    // 4. Basic validation
     if (
-      !updatedData.title ||
-      !updatedData.description ||
-      !updatedData.discountType
+      !title?.trim() ||
+      !description?.trim() ||
+      !discountType ||
+      !startDate ||
+      !endDate ||
+      !applicableTo
     ) {
       return res.status(400).json({
         success: false,
-        message: "Please provide all required fields",
+        message: "Please fill all required fields",
       });
     }
 
-    // Validate status
-    if (!["Active", "Inactive"].includes(updatedData.status)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid offer status",
-      });
-    }
+    // 5. Validate discount type
+    const validDiscountTypes = ["percentage", "fixed", "buy_x_get_y"];
 
-    // Validate discount type
-    if (
-      !["percentage", "fixed", "buy_x_get_y"].includes(updatedData.discountType)
-    ) {
+    if (!validDiscountTypes.includes(discountType)) {
       return res.status(400).json({
         success: false,
         message: "Invalid discount type",
       });
     }
 
-    // Validate discount value
-    if (
-      !Number.isFinite(updatedData.discountValue) ||
-      (updatedData.discountType === "percentage" &&
-        (updatedData.discountValue <= 0 || updatedData.discountValue > 100)) ||
-      (updatedData.discountType === "fixed" && updatedData.discountValue <= 0)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid discount value",
-      });
-    }
+    // 6. Validate applicability
+    const validApplicableTo = ["All Products", "Category", "Products"];
 
-    // Validate buy X get Y
-    if (
-      updatedData.discountType === "buy_x_get_y" &&
-      (!Number.isInteger(updatedData.buyQuantity) ||
-        !Number.isInteger(updatedData.getQuantity) ||
-        updatedData.buyQuantity <= 0 ||
-        updatedData.getQuantity <= 0)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid buy and get quantities",
-      });
-    }
-
-    // Validate dates
-    if (
-      Number.isNaN(updatedData.startDate.getTime()) ||
-      Number.isNaN(updatedData.endDate.getTime()) ||
-      updatedData.endDate <= updatedData.startDate
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid offer dates",
-      });
-    }
-
-    // Validate applicability
-    if (
-      !["All Products", "Category", "Products"].includes(
-        updatedData.applicableTo,
-      )
-    ) {
+    if (!validApplicableTo.includes(applicableTo)) {
       return res.status(400).json({
         success: false,
         message: "Invalid offer applicability",
       });
     }
 
+    // 7. Validate status
+    if (!["Active", "Inactive"].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid offer status",
+      });
+    }
+
+    // 8. Convert values
+    const discount = Number(discountValue || 0);
+    const buy = Number(buyQuantity || 0);
+    const get = Number(getQuantity || 0);
+
+    // 9. Percentage validation
+    if (
+      discountType === "percentage" &&
+      (!Number.isFinite(discount) || discount <= 0 || discount > 100)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Percentage must be between 1 and 100",
+      });
+    }
+
+    // 10. Fixed discount validation
+    if (
+      discountType === "fixed" &&
+      (!Number.isFinite(discount) || discount <= 0)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Fixed discount must be greater than zero",
+      });
+    }
+
+    // 11. Buy X Get Y validation
+    if (
+      discountType === "buy_x_get_y" &&
+      (!Number.isInteger(buy) || !Number.isInteger(get) || buy <= 0 || get <= 0)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Buy and Get quantities must be positive whole numbers",
+      });
+    }
+
+    // 12. Validate dates
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    if (
+      Number.isNaN(start.getTime()) ||
+      Number.isNaN(end.getTime()) ||
+      end <= start
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide valid offer dates",
+      });
+    }
+
+    // 13. Validate category
     const allowedCategories = [
       "Shirts",
       "T-Shirts",
@@ -392,96 +411,128 @@ const updateOffer = async (req, res) => {
       "Shorts",
     ];
 
-    if (
-      updatedData.applicableTo === "Category" &&
-      !allowedCategories.includes(category ?? existingOffer.category)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid category",
-      });
+    if (applicableTo === "Category") {
+      if (!category || !allowedCategories.includes(category)) {
+        return res.status(400).json({
+          success: false,
+          message: "Please select a valid category",
+        });
+      }
     }
 
+    // 14. Handle selected products
+    let selectedProducts = [];
     let productPricing = [];
 
-    // Selected product offers
-    if (updatedData.applicableTo === "Products") {
-      if (products.length === 0) {
+    if (applicableTo === "Products") {
+      // Convert string into array if necessary
+      if (typeof products === "string") {
+        try {
+          products = JSON.parse(products);
+        } catch (error) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid products data",
+          });
+        }
+      }
+
+      if (!Array.isArray(products) || products.length === 0) {
         return res.status(400).json({
           success: false,
           message: "Please select at least one product",
         });
       }
 
-      if (updatedData.discountType !== "percentage") {
-        return res.status(400).json({
-          success: false,
-          message: "Individual product offers support percentage only",
-        });
-      }
+      // Remove duplicate IDs
+      const uniqueIds = [...new Set(products.map(String))];
 
-      const uniqueProducts = [...new Set(products.map(String))];
-
+      // Validate product IDs
       if (
-        uniqueProducts.some(
+        uniqueIds.some(
           (productId) => !mongoose.Types.ObjectId.isValid(productId),
         )
       ) {
         return res.status(400).json({
           success: false,
-          message: "Invalid product ID",
+          message: "Invalid selected product ID",
         });
       }
 
-      const selectedProducts = await dressModel.find({
-        _id: { $in: uniqueProducts },
-      });
+      // Fetch selected products
+      const foundProducts = await dressModel
+        .find({
+          _id: { $in: uniqueIds },
+        })
+        .select("_id price");
 
-      if (selectedProducts.length !== uniqueProducts.length) {
+      if (foundProducts.length !== uniqueIds.length) {
         return res.status(404).json({
           success: false,
-          message: "One or more products were not found",
+          message: "One or more selected products were not found",
         });
       }
 
-      productPricing = selectedProducts.map((product) => {
-        const originalPrice = Number(product.price);
+      selectedProducts = foundProducts.map((product) => product._id);
 
-        return {
-          product: product._id,
-          originalPrice,
-          discountPercentage: updatedData.discountValue,
-          finalPrice: Number(
-            (
-              originalPrice -
-              (originalPrice * updatedData.discountValue) / 100
-            ).toFixed(2),
-          ),
-        };
-      });
+      // Calculate prices only for percentage offers
+      if (discountType === "percentage") {
+        productPricing = foundProducts.map((product) => {
+          const originalPrice = Number(product.price);
 
-      products = uniqueProducts;
+          const finalPrice = Number(
+            (originalPrice - (originalPrice * discount) / 100).toFixed(2),
+          );
+
+          return {
+            product: product._id,
+            originalPrice,
+            discountPercentage: discount,
+            finalPrice,
+          };
+        });
+      }
     }
 
-    const updateData = {
-      ...updatedData,
-      category:
-        updatedData.applicableTo === "Category"
-          ? (category ?? existingOffer.category)
-          : "",
-      products: updatedData.applicableTo === "Products" ? products : [],
-      productPricing,
-    };
+    // 15. Update offer
+    const updatedOffer = await offerModel
+      .findByIdAndUpdate(
+        id,
+        {
+          $set: {
+            title: title.trim(),
+            description: description.trim(),
 
-    const updatedOffer = await offerModel.findByIdAndUpdate(
-      id,
-      { $set: updateData },
-      {
-        new: true,
-        runValidators: true,
-      },
-    );
+            discountType,
 
+            discountValue: discountType === "buy_x_get_y" ? 0 : discount,
+
+            buyQuantity: discountType === "buy_x_get_y" ? buy : 0,
+
+            getQuantity: discountType === "buy_x_get_y" ? get : 0,
+
+            startDate: start,
+            endDate: end,
+
+            status,
+
+            applicableTo,
+
+            category: applicableTo === "Category" ? category : "",
+
+            products: applicableTo === "Products" ? selectedProducts : [],
+
+            productPricing,
+          },
+        },
+        {
+          new: true,
+          runValidators: true,
+        },
+      )
+      .populate("products");
+
+    // 16. Success response
     return res.status(200).json({
       success: true,
       message: "Offer updated successfully",
