@@ -4,7 +4,7 @@ const checkoutSchema = new mongoose.Schema(
   {
     user: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Authentication",
+      ref: "authentication",
       required: true,
     },
 
@@ -15,27 +15,128 @@ const checkoutSchema = new mongoose.Schema(
         required: true,
       },
 
-      name: { type: String, required: true, trim: true },
-      image: { type: String, required: true },
-      price: { type: Number, required: true, min: 0 },
-      costPrice: { type: Number, required: true, min: 0 },
-      quantity: { type: Number, required: true, min: 1 },
-      color: {
-        name: { type: String, required: true },
-        code: { type: String, required: true },
+      name: {
+        type: String,
+        required: true,
       },
-      size: { type: String, required: true },
+
+      image: {
+        type: String,
+        default: "",
+      },
+
+      costPrice: {
+        type: Number,
+        required: true,
+      },
+
+      price: {
+        type: Number,
+        required: true,
+      },
+
+      originalPrice: {
+        type: Number,
+        required: true,
+      },
+
+      finalPrice: {
+        type: Number,
+        required: true,
+      },
+
+      quantity: {
+        type: Number,
+        required: true,
+        min: 1,
+      },
+
+      freeQuantity: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+
+      discountAmount: {
+        type: Number,
+        default: 0,
+      },
+
+      offerId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "offer",
+        default: null,
+      },
+
+      offerTitle: {
+        type: String,
+        default: null,
+      },
+
+      discountType: {
+        type: String,
+        enum: ["percentage", "fixed", "buy_x_get_y", null],
+        default: null,
+      },
+
+      color: {
+        name: {
+          type: String,
+          required: true,
+        },
+
+        code: {
+          type: String,
+          default: "#000000",
+        },
+      },
+
+      size: {
+        type: String,
+        required: true,
+      },
     },
 
     deliveryAddress: {
-      name: { type: String, required: true, trim: true },
-      phone: { type: String, required: true, trim: true },
-      email: { type: String, required: true, trim: true },
-      address: { type: String, required: true, trim: true },
-      city: { type: String, required: true, trim: true },
-      district: { type: String, required: true, trim: true },
-      state: { type: String, required: true, trim: true },
-      pincode: { type: String, required: true, trim: true },
+      name: {
+        type: String,
+        required: true,
+      },
+
+      phone: {
+        type: String,
+        required: true,
+      },
+
+      email: {
+        type: String,
+        required: true,
+      },
+
+      address: {
+        type: String,
+        required: true,
+      },
+
+      city: {
+        type: String,
+        required: true,
+      },
+
+      district: {
+        type: String,
+        required: true,
+      },
+
+      state: {
+        type: String,
+        required: true,
+      },
+
+      pincode: {
+        type: String,
+        required: true,
+      },
     },
 
     paymentMethod: {
@@ -43,10 +144,28 @@ const checkoutSchema = new mongoose.Schema(
       enum: ["Cash on Delivery", "Online Payment"],
       required: true,
     },
+
     paymentStatus: {
       type: String,
       enum: ["Pending", "Paid", "Failed", "Refunded"],
       default: "Pending",
+    },
+
+    paymentDetails: {
+      razorpayOrderId: {
+        type: String,
+        default: null,
+      },
+
+      razorpayPaymentId: {
+        type: String,
+        default: null,
+      },
+
+      razorpaySignature: {
+        type: String,
+        default: null,
+      },
     },
 
     orderStatus: {
@@ -62,13 +181,27 @@ const checkoutSchema = new mongoose.Schema(
       ],
       default: "Pending",
     },
-    totalAmount: { type: Number, required: true, min: 0 },
-    paymentId: { type: String, default: null },
-    orderDate: { type: Date, default: Date.now },
+
+    subtotal: {
+      type: Number,
+      required: true,
+    },
+
+    totalDiscount: {
+      type: Number,
+      default: 0,
+    },
+
+    totalAmount: {
+      type: Number,
+      required: true,
+    },
   },
-  { timestamps: true },
+  {
+    timestamps: true,
+  },
 );
 
-const checkoutSchemaModel = mongoose.model("checkout", checkoutSchema);
+const checkoutModel = mongoose.model("checkout", checkoutSchema);
 
-module.exports = checkoutSchemaModel;
+module.exports = checkoutModel;

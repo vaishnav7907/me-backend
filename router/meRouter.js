@@ -31,6 +31,7 @@ const {
 const settingMiddleware = require("../middleware/middleware");
 const {
   createCheckout,
+  previewCheckoutOffer,
 } = require("../controller/checkoutController/checkoutController");
 const {
   userSignUp,
@@ -183,12 +184,21 @@ router.get("/getProductsByCategory/:category", getShirtsByCategory);
 // checkout section
 
 router.post("/Checkout", settingMiddleware, createCheckout);
-
+router.post("/previewOffer", previewCheckoutOffer);
 // razorpay payment
 
-router.post("/createRazorpayOrder", createRazorpayOrder);
+// Razorpay payment
+router.post(
+  "/createRazorpayOrder",
+  settingMiddleware,
+  createRazorpayOrder
+);
 
-router.post("/verifyRazorpayPayment", verifyRazorpayPayment);
+router.post(
+  "/verifyRazorpayPayment",
+  settingMiddleware,
+  verifyRazorpayPayment
+);
 
 // order status
 
