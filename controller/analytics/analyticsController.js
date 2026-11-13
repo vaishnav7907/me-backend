@@ -97,7 +97,12 @@ const getAdminAnalytics = async (req, res) => {
           orderCost: {
             $multiply: [
               { $ifNull: ["$product.costPrice", 0] },
-              { $ifNull: ["$product.quantity", 0] },
+              {
+                $add: [
+                  { $ifNull: ["$product.quantity", 0] },
+                  { $ifNull: ["$product.freeQuantity", 0] },
+                ],
+              },
             ],
           },
         },
@@ -240,7 +245,7 @@ const calculateMonth = async (start, end) => {
   const monthResult = await checkoutModel.aggregate([
     {
       $match: {
-        orderStatus: "Delevered",
+        orderStatus: "Delivered",
         createdAt: {
           $gte: start,
           $lt: end,
@@ -251,13 +256,18 @@ const calculateMonth = async (start, end) => {
       $group: {
         _id: null,
         revenue: {
-          $sum: { $ifNull: ["$totalAmound", 0] },
+          $sum: { $ifNull: ["$totalAmount", 0] },
         },
         productCost: {
           $sum: {
             $multiply: [
               { $ifNull: ["$product.costPrice", 0] },
-              { $ifNull: ["$product.quantity", 0] },
+              {
+                $add: [
+                  { $ifNull: ["$product.quantity", 0] },
+                  { $ifNull: ["$product.freeQuantity", 0] },
+                ],
+              },
             ],
           },
         },
@@ -265,7 +275,16 @@ const calculateMonth = async (start, end) => {
         missingCostPriceOrders: {
           $sum: {
             $cond: [
-              { $eq: [{ $type: "$product.costPrice" }, "missing"] },
+              {
+                $not: [
+                  {
+                    $and: [
+                      { $isNumber: "$product.costPrice" },
+                      { $gt: ["$product.costPrice", 0] },
+                    ],
+                  },
+                ],
+              },
               1,
               0,
             ],
@@ -283,19 +302,23 @@ const calculateMonth = async (start, end) => {
   };
 
   const profitOrLoss = data.revenue - data.productCost;
-
+  const profitAvailable = data.missingCostPriceOrders === 0;
   return {
     revenue: data.revenue,
     productCost: data.productCost,
-    profit: Math.max(profitOrLoss, 0),
-    loss: Math.max(-profitOrLoss, 0),
-    profitOrLoss,
+
+    profit: profitAvailable ? Math.max(profitOrLoss, 0) : null,
+    loss: profitAvailable ? Math.max(-profitOrLoss, 0) : null,
+    profitOrLoss: profitAvailable ? profitOrLoss : null,
+
     totalOrders: data.totalOrders,
     missingCostPriceOrders: data.missingCostPriceOrders,
+    profitAvailable,
+
     profitMargin:
-      data.revenue > 0
+      profitAvailable && data.revenue > 0
         ? Number(((profitOrLoss / data.revenue) * 100).toFixed(2))
-        : 0,
+        : null,
   };
 };
 
@@ -334,11 +357,14 @@ const previousMonthAnalysis = async (req, res) => {
           year: "numeric",
           timeZone: "UTC",
         }),
-        ...current,
+        ...previous,
       },
       comparison: {
         revenueChange: current.revenue - previous.revenue,
-        profitOrLossChange: current.profitOrLoss - previous.profitOrLoss,
+        profitOrLossChange:
+          current.profitAvailable && previous.profitAvailable
+            ? current.profitOrLoss - previous.profitOrLoss
+            : null,
       },
     });
   } catch (error) {
@@ -352,7 +378,6 @@ const previousMonthAnalysis = async (req, res) => {
 };
 
 const BUSINESS_START_YEAR = 2002;
-
 
 const getCompleteBusinessAnalysis = async (req, res) => {
   try {
@@ -371,17 +396,31 @@ const getCompleteBusinessAnalysis = async (req, res) => {
       },
       {
         $addFields: {
+          hasCostPrice: {
+            $and: [
+              { $isNumber: "$product.costPrice" },
+              { $gt: ["$product.costPrice", 0] },
+            ],
+          },
           orderRevenue: {
             $ifNull: ["$totalAmount", 0],
           },
           orderCost: {
             $multiply: [
               { $ifNull: ["$product.costPrice", 0] },
-              { $ifNull: ["$product.quantity", 0] },
+              {
+                $add: [
+                  { $ifNull: ["$product.quantity", 0] },
+                  { $ifNull: ["$product.freeQuantity", 0] },
+                ],
+              },
             ],
           },
           orderQuantity: {
-            $ifNull: ["$product.quantity", 0],
+            $add: [
+              { $ifNull: ["$product.quantity", 0] },
+              { $ifNull: ["$product.freeQuantity", 0] },
+            ],
           },
         },
       },
@@ -400,6 +439,7 @@ const getCompleteBusinessAnalysis = async (req, res) => {
           },
         },
       },
+
       {
         $facet: {
           summary: [
@@ -421,6 +461,11 @@ const getCompleteBusinessAnalysis = async (req, res) => {
                 totalOrders: {
                   $sum: 1,
                 },
+                ordersWithCost: {
+                  $sum: {
+                    $cond: ["$hasCostPrice", 1, 0],
+                  },
+                },
                 productsSold: {
                   $sum: "$orderQuantity",
                 },
@@ -437,6 +482,7 @@ const getCompleteBusinessAnalysis = async (req, res) => {
                 lifetimeProfit: 1,
                 lifetimeLoss: 1,
                 totalOrders: 1,
+                ordersWithCost: 1,
                 productsSold: 1,
                 customers: {
                   $size: "$customers",
@@ -466,6 +512,11 @@ const getCompleteBusinessAnalysis = async (req, res) => {
                 orders: {
                   $sum: 1,
                 },
+                ordersWithCost: {
+                  $sum: {
+                    $cond: ["$hasCostPrice", 1, 0],
+                  },
+                },
                 productsSold: {
                   $sum: "$orderQuantity",
                 },
@@ -482,6 +533,7 @@ const getCompleteBusinessAnalysis = async (req, res) => {
                 profit: 1,
                 loss: 1,
                 orders: 1,
+                ordersWithCost: 1,
                 productsSold: 1,
                 customers: {
                   $size: "$customers",
@@ -507,6 +559,21 @@ const getCompleteBusinessAnalysis = async (req, res) => {
                 profit: {
                   $sum: "$orderProfit",
                 },
+                orders: {
+                  $sum: 1,
+                },
+                ordersWithCost: {
+                  $sum: {
+                    $cond: ["$hasCostPrice", 1, 0],
+                  },
+                },
+              },
+            },
+            {
+              $match: {
+                $expr: {
+                  $eq: ["$ordersWithCost", "$orders"],
+                },
               },
             },
             {
@@ -531,13 +598,20 @@ const getCompleteBusinessAnalysis = async (req, res) => {
       lifetimeProfit: 0,
       lifetimeLoss: 0,
       totalOrders: 0,
+      ordersWithCost: 0,
       productsSold: 0,
       customers: 0,
     };
 
+    const profitAvailable = summary.ordersWithCost === summary.totalOrders;
+
     const revenue = summary.lifetimeRevenue;
-    const profit = summary.lifetimeProfit;
-    const lifetimeLoss = summary.lifetimeLoss;
+
+    const profit = profitAvailable ? summary.lifetimeProfit : null;
+
+    const lifetimeLoss = profitAvailable ? summary.lifetimeLoss : null;
+
+    const lifetimeCost = profitAvailable ? summary.lifetimeCost : null;
 
     res.status(200).json({
       success: true,
@@ -545,30 +619,42 @@ const getCompleteBusinessAnalysis = async (req, res) => {
       currentYear,
 
       lifetimeRevenue: revenue,
-      lifetimeCost: summary.lifetimeCost,
+      lifetimeCost,
       lifetimeProfit: profit,
       lifetimeLoss,
+
+      profitAvailable,
+      missingCostPriceOrders: summary.totalOrders - summary.ordersWithCost,
 
       totalOrders: summary.totalOrders,
       productsSold: summary.productsSold,
       customers: summary.customers,
 
       profitMargin:
-        revenue > 0
+        profitAvailable && revenue > 0
           ? Number(((profit / revenue) * 100).toFixed(2))
-          : 0,
+          : null,
 
       lossRatio:
-        revenue > 0
+        profitAvailable && revenue > 0
           ? Number(((lifetimeLoss / revenue) * 100).toFixed(2))
-          : 0,
+          : null,
 
       averageOrder:
         summary.totalOrders > 0
           ? Number((revenue / summary.totalOrders).toFixed(2))
           : 0,
 
-      yearlyData: result?.yearlyData || [],
+      yearlyData: (result?.yearlyData || []).map((item) => {
+        const yearProfitAvailable = item.ordersWithCost === item.orders;
+
+        return {
+          ...item,
+          profitAvailable: yearProfitAvailable,
+          profit: yearProfitAvailable ? item.profit : null,
+          loss: yearProfitAvailable ? item.loss : null,
+        };
+      }),
 
       bestProfitYear: result?.yearlyProfit?.[0]
         ? {
@@ -577,7 +663,7 @@ const getCompleteBusinessAnalysis = async (req, res) => {
           }
         : {
             year: null,
-            profit: 0,
+            profit: null,
           },
     });
   } catch (error) {
@@ -590,5 +676,8 @@ const getCompleteBusinessAnalysis = async (req, res) => {
   }
 };
 
-
-module.exports = { getAdminAnalytics, previousMonthAnalysis, getCompleteBusinessAnalysis };
+module.exports = {
+  getAdminAnalytics,
+  previousMonthAnalysis,
+  getCompleteBusinessAnalysis,
+};

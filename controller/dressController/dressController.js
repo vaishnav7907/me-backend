@@ -1016,9 +1016,80 @@ const deleteProduct = async (req, res) => {
   }
 };
 
+const deleteMultipleProducts = async (req, res) => {
+  try {
+    const { productIds } = req.body;
+
+    if (!productIds || !Array.isArray(productIds) || productIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select at least one product",
+      });
+    }
+
+    const products = await dressModel.find({
+      _id: { $in: productIds },
+    });
+
+    if (products.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No products found",
+      });
+    }
+
+    for (const product of products) {
+      for (const variant of product.variants) {
+        const mainImage = variant.color?.mainImage;
+
+        if (mainImage?.publicId) {
+          try {
+            await cloudinary.uploader.destroy(mainImage.publicId, {
+              resource_type: "image",
+            });
+          } catch (error) {
+            console.log("Main image deletion failed:", error.message);
+          }
+        }
+
+        for (const image of variant.color?.subImages || []) {
+          if (image?.publicId) {
+            try {
+              await cloudinary.uploader.destroy(image.publicId, {
+                resource_type: "image",
+              });
+            } catch (error) {
+              console.log("Sub image deletion failed:", error.message);
+            }
+          }
+        }
+      }
+    }
+
+    const deleteProductss = await dressModel.deleteMany({
+      _id: { $in: products.map((product) => product._id) },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `${deleteProductss.deletedCount} products deleted successfully`,
+      deletedCount: deleteProductss.deletedCount,
+    });
+  } catch (error) {
+    console.log("Error deleting selected products:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete selected products",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createDress,
   getProducts,
   updateProducts,
   deleteProduct,
+  deleteMultipleProducts
 };

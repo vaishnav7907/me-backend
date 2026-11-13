@@ -6,6 +6,7 @@ const {
   getProducts,
   updateProducts,
   deleteProduct,
+  deleteMultipleProducts,
 } = require("../controller/dressController/dressController");
 // const {
 //   userSignUp,
@@ -106,6 +107,9 @@ router.patch("/updateProduct/:id", upload.array("images", 10), updateProducts);
 // delete product
 
 router.delete("/deleteProduct/:id", deleteProduct);
+
+
+router.delete("/deleteMultipleProducts",adminMiddleware,deleteMultipleProducts)
 
 // get new Arrivals
 router.get("/NewArrivals", getNewArrivals);

@@ -4,7 +4,7 @@ const checkoutSchema = new mongoose.Schema(
   {
     user: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "authentication",
+      ref: "Authentication",
       required: true,
     },
 
