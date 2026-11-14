@@ -25,6 +25,7 @@ const {
   getBrands,
   updateBrands,
   deleteBrands,
+  deleteMultipleBrands,
 } = require("../controller/brandController/brandController");
 const {
   getShirtsByCategory,
@@ -158,6 +159,7 @@ router.patch(
 
 router.delete("/deleteBrand/:id", deleteBrands);
 
+router.delete("/deleteMultipleBrands",adminMiddleware, deleteMultipleBrands)
 // latest arrivals
 
 router.post(

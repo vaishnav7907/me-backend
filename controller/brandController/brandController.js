@@ -369,9 +369,79 @@ const deleteBrands = async (req, res) => {
   }
 };
 
+const deleteMultipleBrands = async (req, res) => {
+  try {
+    const { brandIds } = req.body;
+
+    if (!Array.isArray(brandIds) || brandIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select at least one brand",
+      });
+    }
+
+    const isExistBrand = await brandModel.find({
+      _id: { $in: brandIds },
+    });
+
+    if (isExistBrand.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No brands found",
+      });
+    }
+
+    const brandedProducts = await dressModel.countDocuments({
+      brand: { $in: brandIds },
+    });
+
+    if (brandedProducts > 0) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Cannot delete selected brands because products are using them",
+        brandedProducts,
+      });
+    }
+
+    for (const brand of isExistBrand) {
+      if (brand.brandIcon?.publicId) {
+        await cloudinary.uploader.destroy(brand.brandIcon.publicId, {
+          resource_type: "image",
+        });
+      }
+
+      if (brand.brandImage?.publicId) {
+        await cloudinary.uploader.destroy(brand.brandImage.publicId, {
+          resource_type: "image",
+        });
+      }
+    }
+
+    const deleteMultiBrands = await brandModel.deleteMany({
+      _id: { $in: isExistBrand.map((brand) => brand._id) },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `${deleteMultiBrands.deletedCount} brands deleted successfully`,
+      deletedCount: deleteMultiBrands.deletedCount,
+    });
+  } catch (error) {
+    console.log("Error deleting selected brands:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete selected brands",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createBrand,
   getBrands,
   updateBrands,
   deleteBrands,
+  deleteMultipleBrands,
 };
