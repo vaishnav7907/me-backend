@@ -1,7 +1,10 @@
 const checkoutModel = require("../../model/checkout/checkoutModel");
+const dressModel = require("../../model/dress/dress");
+
 const getAdminAnalytics = async (req, res) => {
   const TIME_ZONE = "Asia/Kolkata";
   const IST_OFFSET = 330 * 60 * 1000;
+
   try {
     const { period = "monthly" } = req.query;
     const now = new Date();
@@ -45,7 +48,7 @@ const getAdminAnalytics = async (req, res) => {
     ) {
       return res.status(400).json({
         success: false,
-        message: "invalid month",
+        message: "Invalid month",
       });
     }
 
@@ -77,20 +80,18 @@ const getAdminAnalytics = async (req, res) => {
       {
         $match: {
           orderStatus: "Delivered",
-
           createdAt: {
             $gte: startDate,
             $lt: endDate,
           },
         },
       },
-
       {
         $addFields: {
           hasCostPrice: {
             $and: [
               { $isNumber: "$product.costPrice" },
-              { $gt: ["$product.costPrice", 0] },
+              { $gte: ["$product.costPrice", 0] },
             ],
           },
 
@@ -107,7 +108,6 @@ const getAdminAnalytics = async (req, res) => {
           },
         },
       },
-
       {
         $group: {
           _id: {
@@ -117,15 +117,19 @@ const getAdminAnalytics = async (req, res) => {
               timezone: TIME_ZONE,
             },
           },
+
           revenue: {
             $sum: { $ifNull: ["$totalAmount", 0] },
           },
+
           totalCost: {
             $sum: "$orderCost",
           },
+
           orderCount: {
             $sum: 1,
           },
+
           ordersWithCost: {
             $sum: {
               $cond: ["$hasCostPrice", 1, 0],
@@ -144,6 +148,7 @@ const getAdminAnalytics = async (req, res) => {
 
     if (period === "daily") {
       const daysInMonth = new Date(year, month, 0).getDate();
+
       labels = Array.from(
         { length: daysInMonth },
         (_, index) =>
@@ -177,12 +182,20 @@ const getAdminAnalytics = async (req, res) => {
 
     const analytics = labels.map((label) => {
       const item = resultMap.get(label);
-      const hasCompleteCosts = item && item.ordersWithCost === item.orderCount;
+
+      const hasCompleteCosts = !item || item.ordersWithCost === item.orderCount;
+
+      const revenue = item?.revenue ?? 0;
+
+      const profit = hasCompleteCosts ? revenue - (item?.totalCost ?? 0) : null;
+
+      const loss = profit === null ? null : Math.max(0, -profit);
 
       return {
         label,
-        revenue: item?.revenue ?? 0,
-        profit: hasCompleteCosts ? item.revenue - item.totalCost : null,
+        revenue,
+        profit,
+        loss,
         orderCount: item?.orderCount ?? 0,
       };
     });
@@ -202,15 +215,15 @@ const getAdminAnalytics = async (req, res) => {
     );
 
     const totalProfit = profitAvailable
-      ? companyCalculations.reduce(
-          (total, item) => total + item.revenue - item.totalCost,
-          0,
-        )
+      ? analytics.reduce((total, item) => total + item.profit, 0)
+      : null;
+
+    const totalLoss = profitAvailable
+      ? analytics.reduce((total, item) => total + item.loss, 0)
       : null;
 
     return res.status(200).json({
       success: true,
-
       period,
       year,
       ...(period === "daily" ? { month } : {}),
@@ -218,6 +231,7 @@ const getAdminAnalytics = async (req, res) => {
       summary: {
         totalRevenue,
         totalProfit,
+        totalLoss,
         totalOrders,
         profitAvailable,
       },

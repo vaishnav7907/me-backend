@@ -78,6 +78,7 @@ const {
   getProductsWithOffers,
   updateOffer,
 } = require("../controller/offerSaleController/offerSaleController");
+const { profitGenerate } = require("../controller/analytics/topProfitOverview");
 
 const router = express.Router();
 
@@ -256,4 +257,5 @@ router.get("/getOffers", getOffer);
 // router.get("/getProductsWithOffers",getProductsWithOffers)
 router.delete("/removeOffer/:id",adminMiddleware, removeOffer);
 
+router.get("/profitGenerate",profitGenerate)
 module.exports = router;

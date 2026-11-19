@@ -27,24 +27,34 @@ const getNewArrivals = async (req, res) => {
 
 const createLatestArrivals = async (req, res) => {
   try {
-    const { description, category, name } = req.body;
+    const { description, category, name, status } = req.body;
 
-    if (!name) {
-      return res
-        .status(400)
-        .json({ success: false, message: "name  Required" });
+    if (!name?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Name is required",
+      });
     }
 
-    if (!description) {
-      return res
-        .status(400)
-        .json({ success: false, message: "description Required" });
+    if (!description?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Description is required",
+      });
     }
 
-    if (!category) {
-      return res
-        .status(404)
-        .json({ success: false, message: " select category " });
+    if (!category?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select a category",
+      });
+    }
+
+    if (!status) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select a status",
+      });
     }
 
     if (!req.file) {
@@ -74,30 +84,32 @@ const createLatestArrivals = async (req, res) => {
           }
         },
       );
+
       streamiFier.createReadStream(optimizeImage).pipe(uploadImage);
     });
 
     const createArrivalsFn = await latestArrivalsModel.create({
-      name,
+      name: name.trim(),
       category,
-      description,
+      description: description.trim(),
       arrivalsCategoryImage: {
         url: uploadLatestArrivalsImage.secure_url,
         publicId: uploadLatestArrivalsImage.public_id,
       },
+      status,
     });
 
     return res.status(201).json({
       success: true,
-      message: "latest Arivals created successfully",
+      message: "Latest arrivals created successfully",
       latestArrivals: createArrivalsFn,
     });
   } catch (error) {
-    console.log("Create brand error:", error);
+    console.log("Create latest arrivals error:", error);
 
     return res.status(500).json({
       success: false,
-      message: "Failed to create latest Arrivals",
+      message: "Failed to create latest arrivals",
       error: error.message,
     });
   }
@@ -160,8 +172,10 @@ const deleteLatestArrivals = async (req, res) => {
 };
 
 const updateLatestArrivals = async (req, res) => {
+  let newPublicId = null;
+
   try {
-    const { description, category, name } = req.body;
+    const { description, category, name, status } = req.body;
     const { id } = req.params;
 
     const existingLatestArrivals = await latestArrivalsModel.findById(id);
@@ -175,8 +189,8 @@ const updateLatestArrivals = async (req, res) => {
 
     const updateLatestArrivalsData = {};
     let oldPublicId = null;
-    let newPublicId = null;
 
+    // Upload new image
     if (req.file) {
       const imageBuffer = req.file.buffer;
 
@@ -213,16 +227,24 @@ const updateLatestArrivals = async (req, res) => {
       };
     }
 
+    // Update name
     if (name !== undefined && name.trim() !== "") {
-      updateLatestArrivalsData.name = name;
+      updateLatestArrivalsData.name = name.trim();
     }
 
+    // Update description
     if (description !== undefined && description.trim() !== "") {
-      updateLatestArrivalsData.description = description;
+      updateLatestArrivalsData.description = description.trim();
     }
 
+    // Update category
     if (category !== undefined && category.trim() !== "") {
-      updateLatestArrivalsData.category = category;
+      updateLatestArrivalsData.category = category.trim();
+    }
+
+    // Update status
+    if (status !== undefined && status !== "") {
+      updateLatestArrivalsData.status = status;
     }
 
     if (Object.keys(updateLatestArrivalsData).length === 0) {
@@ -232,7 +254,7 @@ const updateLatestArrivals = async (req, res) => {
       });
     }
 
-    const updateLatestArrivals = await latestArrivalsModel.findByIdAndUpdate(
+    const updatedLatestArrivals = await latestArrivalsModel.findByIdAndUpdate(
       id,
       updateLatestArrivalsData,
       {
@@ -241,11 +263,12 @@ const updateLatestArrivals = async (req, res) => {
       },
     );
 
-    if (!updateLatestArrivals) {
+    if (!updatedLatestArrivals) {
       if (newPublicId) {
         await cloudinary.uploader.destroy(newPublicId, {
           resource_type: "image",
         });
+        newPublicId = null;
       }
 
       return res.status(404).json({
@@ -254,6 +277,7 @@ const updateLatestArrivals = async (req, res) => {
       });
     }
 
+    // Delete old image after successful database update
     if (oldPublicId && newPublicId) {
       try {
         await cloudinary.uploader.destroy(oldPublicId, {
@@ -269,9 +293,20 @@ const updateLatestArrivals = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Latest arrival updated successfully",
-      latestArrivals: updateLatestArrivals,
+      latestArrivals: updatedLatestArrivals,
     });
   } catch (error) {
+    // Remove newly uploaded image if update fails
+    if (newPublicId) {
+      try {
+        await cloudinary.uploader.destroy(newPublicId, {
+          resource_type: "image",
+        });
+      } catch (cloudinaryError) {
+        console.log("Failed to delete new image:", cloudinaryError);
+      }
+    }
+
     console.log("Update latest arrival error:", error);
 
     return res.status(500).json({
@@ -281,6 +316,7 @@ const updateLatestArrivals = async (req, res) => {
     });
   }
 };
+
 module.exports = {
   getNewArrivals,
   createLatestArrivals,

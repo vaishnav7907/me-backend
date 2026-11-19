@@ -20,6 +20,11 @@ const latestShrtSchema = new mongoose.Schema(
       },
     },
     description: { type: String, default: "" },
+    status: {
+      type: String,
+      enum: ["Active", "Inactive"],
+      required: true,
+    },
   },
   { timestamps: true },
 );
