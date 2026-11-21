@@ -276,5 +276,5 @@ router.patch(
   upload.fields([{ name: "welcomeImage", maxCount: 1 }]),
   updateWelcomeImage,
 );
-router.delete("/deleteWelcomeImage", adminMiddleware, deleteWelcomeImage);
+router.delete("/deleteWelcomeImage/:id", adminMiddleware, deleteWelcomeImage);
 module.exports = router;

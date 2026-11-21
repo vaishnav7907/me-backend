@@ -220,7 +220,9 @@ const updateWelcomeImage = async (req, res) => {
 
 const deleteWelcomeImage = async (req, res) => {
   try {
-    const findWelcomeImage = await welcomePageModel.findOne();
+    const { id } = req.params;
+
+    const findWelcomeImage = await welcomePageModel.findById(id);
 
     if (!findWelcomeImage) {
       return res.status(404).json({
@@ -235,9 +237,7 @@ const deleteWelcomeImage = async (req, res) => {
       await cloudinary.uploader.destroy(publicId);
     }
 
-    const deleteWelcomeImageData = await welcomePageModel.findByIdAndDelete(
-      findWelcomeImage._id,
-    );
+    const deleteWelcomeImageData = await welcomePageModel.findByIdAndDelete(id);
 
     if (!deleteWelcomeImageData) {
       return res.status(404).json({
