@@ -72,13 +72,19 @@ const {
 } = require("../controller/addToCart/addToCart");
 const {
   createOffer,
-  
+
   getOffer,
   removeOffer,
   getProductsWithOffers,
   updateOffer,
 } = require("../controller/offerSaleController/offerSaleController");
 const { profitGenerate } = require("../controller/analytics/topProfitOverview");
+const {
+  createWelcomePageImage,
+  getWelcomeImage,
+  updateWelcomeImage,
+  deleteWelcomeImage,
+} = require("../controller/welcomePageController/welcomePageController");
 
 const router = express.Router();
 
@@ -110,8 +116,11 @@ router.patch("/updateProduct/:id", upload.array("images", 10), updateProducts);
 
 router.delete("/deleteProduct/:id", deleteProduct);
 
-
-router.delete("/deleteMultipleProducts",adminMiddleware,deleteMultipleProducts)
+router.delete(
+  "/deleteMultipleProducts",
+  adminMiddleware,
+  deleteMultipleProducts,
+);
 
 // get new Arrivals
 router.get("/NewArrivals", getNewArrivals);
@@ -160,7 +169,7 @@ router.patch(
 
 router.delete("/deleteBrand/:id", deleteBrands);
 
-router.delete("/deleteMultipleBrands",adminMiddleware, deleteMultipleBrands)
+router.delete("/deleteMultipleBrands", adminMiddleware, deleteMultipleBrands);
 // latest arrivals
 
 router.post(
@@ -195,17 +204,9 @@ router.post("/previewOffer", previewCheckoutOffer);
 // razorpay payment
 
 // Razorpay payment
-router.post(
-  "/createRazorpayOrder",
-  settingMiddleware,
-  createRazorpayOrder
-);
+router.post("/createRazorpayOrder", settingMiddleware, createRazorpayOrder);
 
-router.post(
-  "/verifyRazorpayPayment",
-  settingMiddleware,
-  verifyRazorpayPayment
-);
+router.post("/verifyRazorpayPayment", settingMiddleware, verifyRazorpayPayment);
 
 // order status
 
@@ -251,11 +252,29 @@ router.delete("/removeCartItem/:itemId", settingMiddleware, removeFromCart);
 
 // offer
 
-router.post("/createOffer",adminMiddleware, createOffer);
-router.patch("/updateOffer/:id",adminMiddleware, updateOffer);
+router.post("/createOffer", adminMiddleware, createOffer);
+router.patch("/updateOffer/:id", adminMiddleware, updateOffer);
 router.get("/getOffers", getOffer);
 // router.get("/getProductsWithOffers",getProductsWithOffers)
-router.delete("/removeOffer/:id",adminMiddleware, removeOffer);
+router.delete("/removeOffer/:id", adminMiddleware, removeOffer);
 
-router.get("/profitGenerate",profitGenerate)
+router.get("/profitGenerate", profitGenerate);
+
+// welcomepage image
+
+
+router.post(
+  "/createWelcomeImage",
+  adminMiddleware,
+  upload.fields([{ name: "welcomeImage", maxCount: 1 }]),
+  createWelcomePageImage,
+);
+router.get("/getWelcomeImage", getWelcomeImage);
+router.patch(
+  "/updateWelcomeImage/:id",
+  adminMiddleware,
+  upload.fields([{ name: "welcomeImage", maxCount: 1 }]),
+  updateWelcomeImage,
+);
+router.delete("/deleteWelcomeImage", adminMiddleware, deleteWelcomeImage);
 module.exports = router;
